@@ -12,6 +12,75 @@ import random
 import os
 import time
 from tqdm import tqdm
+import torch
+import torch.nn as nn
+
+# The below class is from https://github.com/hubutui/DiceLoss-PyTorch and was modified
+# It is a loss function based on the Dice score.
+class BinaryDiceScore(nn.Module):
+    """Dice score of binary class
+    Args:
+        smooth: A float number to smooth score, and avoid NaN error, default: 1
+        p: Denominator value: \sum{x^p} + \sum{y^p}, default: 2
+        predict: A tensor of shape [N, *]
+        target: A tensor of shape same with predict
+        reduction: Reduction method to apply, return mean over batch if 'mean',
+            return sum if 'sum', return a tensor of shape [N,] if 'none'
+    Returns:
+        Dice score tensor according to arg reduction
+    Raise:
+        Exception if unexpected reduction
+    """
+    def __init__(self, smooth=1e-6, p=2, reduction='sum'):
+        super(BinaryDiceScore, self).__init__()
+        self.smooth = smooth
+        self.p = p
+        self.reduction = reduction
+
+    def forward(self, predict, target):
+        assert predict.shape[0] == target.shape[0], "predict & target batch size don't match"
+        predict = predict.contiguous().view(predict.shape[0], -1)
+        target = target.contiguous().view(target.shape[0], -1)
+
+        num = torch.sum(torch.mul(predict, target), dim=1) + self.smooth
+        den = torch.sum(predict.pow(self.p) + target.pow(self.p), dim=1) + self.smooth
+
+        dice_score = num / den
+
+        if self.reduction == 'mean':
+            return dice_score.mean()
+        elif self.reduction == 'sum':
+            return dice_score.sum()
+        elif self.reduction == 'none':
+            return dice_score
+        else:
+            raise Exception('Unexpected reduction {}'.format(self.reduction))
+
+def evaluate(model, loader, device='cuda', criterion=None,
+             threshold=0.5, verbose=False, leave_on_train=False):
+    """
+    Calculates the average dice score over the entire dataloader
+    """
+    print('>>> Calculating Dice Score')
+    
+    model.eval()
+    dice_scores = []
+    criterion = BinaryDiceScore() if criterion is None else criterion
+    loop = tqdm(loader) if verbose else loader
+    
+    with torch.no_grad():
+        for _, (x, y) in enumerate(loop):
+            x = x.to(device)
+            y = y.to(device)
+            preds = model(x)
+            preds = (preds > threshold).float() # convert to binary mask
+            dice_scores.append(criterion(preds, y).item())
+    if leave_on_train:
+        model.train()
+    
+    mean_dice_score = np.mean(dice_scores)
+    return mean_dice_score
+
 
 def save_checkpoint(state, filename='checkpoints/checkpoint.pth.tar'):
     """
@@ -114,7 +183,66 @@ def plot_prediction(ind=0, folder='saved_images'):
     axs[2].axis('off')
     plt.show()
 
-def plot_samples(num, folder='saved_images', include_image=True, shuffle=True, title='Samples'):
+def eval_and_plot(model, loader, device='cuda', 
+                         save_location='examples/', 
+                         shuffle=True, n_images=6, 
+                         threshold=0.5, verbose=True):
+    """
+    Assumes the loader has batch size 1.
+    """
+    model.eval()
+    dice_scores = []
+    criterion = BinaryDiceScore()# if criterion is None else criterion
+    plot_images = []
+    loop = tqdm(loader) if verbose else loader
+    
+    # choose n_images random indices from the loader
+    if shuffle:
+        indices = random.sample(range(len(loader)), n_images)
+    else:
+        indices = range(n_images)
+    
+    with torch.no_grad():
+        for ind, (x, y) in enumerate(loop):
+            img = x.to(device)
+            mask = y.to(device)
+            pred = model(img)
+            pred = (pred > threshold).float() # convert to binary mask
+            dice_scores.append(criterion(pred, mask).item())
+            
+            if ind in indices:
+                # need to reshape the image and mask to not have batch dimension
+                img = img.squeeze(0)
+                mask = mask.squeeze(1)
+                pred = pred.squeeze(1)
+                # print(f'IMG SHAPE: {img.shape}, MASK SHAPE: {mask.shape}')
+                
+                
+                # plot_images.append(img)
+                plot_images.append(mask)
+                plot_images.append(pred)
+
+    # if leave_on_train:
+    # model.train()
+    
+    examples = torchvision.utils.make_grid(plot_images, nrow=2)
+    examples = examples.cpu()
+    # plot the examples
+    fig, ax = plt.subplots(figsize=(20, 10))
+    ax.imshow(examples.permute(1, 2, 0))
+    ax.axis('off')
+    ax.set_title('Examples, (mask, prediction)')
+    plt.show()
+    # save the examples to the save_location
+    file = f'{save_location}examples.png'
+    torchvision.utils.save_image(examples, file)
+    
+    mean_dice_score = np.mean(dice_scores)
+    return mean_dice_score
+
+def plot_samples(num, folder='saved_images', 
+                 include_image=True, shuffle=True, 
+                 title='Samples'):
     """
     Assumes the folder contains the following subfolders:
     preds, masks, orig.
@@ -137,9 +265,15 @@ def plot_samples(num, folder='saved_images', include_image=True, shuffle=True, t
     else:
         indices = range(num)
     
+    # use the torchvision function plot grid to plot the images in 3 columns: original, mask, prediction
     if include_image:
         fig, axs = plt.subplots(num, 3, figsize=(20, 10*num))
+        image_list = []
         for i, ind in enumerate(indices):
+            # image_list.append(Image.open(preds_path + preds[ind]))
+            # image_list.append(Image.open(masks_path + masks[ind]))
+            # image_list.append(Image.open(orig_path + origs[ind]))
+            
             pred = Image.open(preds_path + preds[ind])
             mask = Image.open(masks_path + masks[ind])
             orig = Image.open(orig_path + origs[ind])
@@ -154,9 +288,13 @@ def plot_samples(num, folder='saved_images', include_image=True, shuffle=True, t
             axs[i, 2].axis('off')
         fig.suptitle(title)
         plt.show()
+        # torchvision.utils.make_grid(image_list, nrow=3).show()
     else:
         fig, axs = plt.subplots(num, 2, figsize=(20, 10*num))
         for i, ind in enumerate(indices):
+            # image_list.append(Image.open(preds_path + preds[ind]))
+            # image_list.append(Image.open(masks_path + masks[ind]))
+            
             pred = Image.open(preds_path + preds[ind])
             mask = Image.open(masks_path + masks[ind])
             axs[i, 0].imshow(mask)
@@ -167,6 +305,8 @@ def plot_samples(num, folder='saved_images', include_image=True, shuffle=True, t
             axs[i, 1].axis('off')
         fig.suptitle(title)
         plt.show()
+        
+        # torchvision.utils.make_grid(image_list, nrow=2).show()
 
 def plot_samples_mask_overlay(dataset, n=12):
     """

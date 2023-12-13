@@ -88,6 +88,48 @@ class UpsamplingModule(nn.Module):
         out = self.layers(x)
         return out
 
+class AttentionBlock(nn.Module):
+    """Attention block with learnable parameters"""
+
+    def __init__(self, F_g, F_l, n_coefficients):
+        """
+        :param F_g: number of feature maps (channels) in previous layer
+        :param F_l: number of feature maps in corresponding encoder layer, transferred via skip connection
+        :param n_coefficients: number of learnable multi-dimensional attention coefficients
+        """
+        super(AttentionBlock, self).__init__()
+
+        self.W_gate = nn.Sequential(
+            nn.Conv2d(F_g, n_coefficients, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm2d(n_coefficients)
+        )
+
+        self.W_x = nn.Sequential(
+            nn.Conv2d(F_l, n_coefficients, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm2d(n_coefficients)
+        )
+
+        self.psi = nn.Sequential(
+            nn.Conv2d(n_coefficients, 1, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm2d(1),
+            nn.Sigmoid()
+        )
+
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, gate, skip_connection):
+        """
+        :param gate: gating signal from previous layer
+        :param skip_connection: activation from corresponding encoder layer
+        :return: output activations
+        """
+        g1 = self.W_gate(gate)
+        x1 = self.W_x(skip_connection)
+        psi = self.relu(g1 + x1)
+        psi = self.psi(psi)
+        out = skip_connection * psi
+        return out
+
 
 class ImprovedUNet(nn.Module):
     """
@@ -135,6 +177,10 @@ class ImprovedUNet(nn.Module):
             # upsampling module in last encoder block increases spatial dimensions by 2 for decoder
             UpsamplingModule(features[4], features[3]), # 256 channels in, 128 channels out
         )
+        
+        # Adding in attention blocks gates at the concatenation of the skip connection and the bottleneck layer
+        self.attention1 = AttentionBlock(features[3], features[3], 32)
+        
         # Upsampling modules half the number of feature maps but after upsampling, the output
         # is concatenated with the skip connection, so the number of feature maps is doubled
         # the localization modules then halve the number of feature maps again
@@ -142,11 +188,14 @@ class ImprovedUNet(nn.Module):
             LocalisationModule(features[4], features[3]), # 256 channels in, 128 channels out
             UpsamplingModule(features[3], features[2]), # 128 channels in, 64 channels out
         )
+        self.attention2 = AttentionBlock(features[2], features[2], 64)
         # these decoder layers need to be split up to allow for skip connections
         self.localisation2 = LocalisationModule(features[3], features[2]) # 128 channels in, 64 channels out
         self.up3 = UpsamplingModule(features[2], features[1]) # 64 channels in, 32 channels out, double spatial dimensions
+        self.attention3 = AttentionBlock(features[1], features[1], 128)
         self.localisation3 = LocalisationModule(features[2], features[1]) # 64 channels in, 32 channels out
         self.up4 = UpsamplingModule(features[1], features[0]) # 32 channels in, 16 channels out, double spatial dimensions
+        self.attention4 = AttentionBlock(features[0], features[0], 256)
         self.final_conv = nn.Sequential(
             nn.Conv2d(features[1], features[1], kernel_size=1), # 32 channels in, 32 channels out, final convolutional layer
             nn.LeakyReLU(negative_slope=1e-2),
@@ -183,11 +232,19 @@ class ImprovedUNet(nn.Module):
         
         # use skip connections as a stack to allow for easy popping
         # concatenate the skip connection with 128 channels with the bottleneck layer with 128 channels
-        x = torch.cat((x, skip_connections.pop()), dim=1)
+        # x = torch.cat((x, skip_connections.pop()), dim=1)
+        
+        # First attention block
+        a = self.attention1(x, skip_connections.pop())
+        x = torch.cat((a, x), dim=1)
         
         x = self.decoder_block1(x) # 256 channels in, 64 channels out
         # concatenate the skip connection with 64 channels with the bottleneck layer with 64 channels
-        x = torch.cat((x, skip_connections.pop()), dim=1)
+        # x = torch.cat((x, skip_connections.pop()), dim=1)
+        
+        # Second attention block
+        a = self.attention2(x, skip_connections.pop())
+        x = torch.cat((a, x), dim=1)
         
         x = self.localisation2(x) # 128 channels in, 64 channels out
         # additional skip connections for segmentation layers in the decoder
@@ -195,8 +252,13 @@ class ImprovedUNet(nn.Module):
         seg_connection1 = self.upscale1(seg_connection1)
         
         x = self.up3(x)
+        
         # concatenate the skip connection with 32 channels with the bottleneck layer with 32 channels
-        x = torch.cat((x, skip_connections.pop()), dim=1)
+        # x = torch.cat((x, skip_connections.pop()), dim=1)
+        
+        # Third attention block
+        a = self.attention3(x, skip_connections.pop())
+        x = torch.cat((a, x), dim=1)
         
         x = self.localisation3(x) # 64 channels in, 32 channels out
         # additional skip connections for segmentation layers in the decoder
@@ -207,11 +269,18 @@ class ImprovedUNet(nn.Module):
         
         x = self.up4(x)
         # concatenate the skip connection with 16 channels with the bottleneck layer with 16 channels
-        x = torch.cat((x, skip_connections.pop()), dim=1)
+        # x = torch.cat((x, skip_connections.pop()), dim=1)
+        
+        # Fourth attention block
+        a = self.attention4(x, skip_connections.pop())
+        x = torch.cat((a, x), dim=1)
         
         x = self.final_conv(x) # 32 channels in, 1 channel out, includes final convolutional layer and segmentation layer
         
         # element wise addition of the segmentation connections
         x += seg_connection2
         
-        return x # no final activation function
+        # use sigmoid activation function to squash the output to between 0 and 1
+        # x = torch.sigmoid(x)
+        return x
+        # return x # no final activation function

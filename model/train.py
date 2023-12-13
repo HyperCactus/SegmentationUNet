@@ -11,19 +11,25 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from modules import ImprovedUNet
-from dataset import ISICDataset
+from dataset import CustomDataset, augment_image
+from sklearn.model_selection import train_test_split
 import time
 from utils import *
+from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss
 from global_params import * # Hyperparameters and other global variables
-from dice_loss import BinaryDiceLoss
+# from dice_loss import BinaryDiceLoss
 
 # set the device to cuda if available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-LOAD_MODEL = False
+
+
+
+
+LOAD_MODEL = True
 SAVE_EPOCH_DATA = False#True
 
-def train_epoch(loader, model, optimizer, loss_fn, scaler, losses, train_dice_scores):
+def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
     """Trains the model for one epoch
 
     Args:
@@ -33,9 +39,10 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses, train_dice_sc
         loss_fn (nn.Module): The loss function
         scaler (torch.cuda.amp.GradScaler): The gradient scaler
         losses (list): The list to store the losses
-        train_dice_scores (list): The list to store the training dice scores
     """
+    eval = BinaryDiceScore()
     loop = tqdm(loader)
+    length = len(loader)
     # loop = loader
     for batch_idx, (data, targets) in enumerate(loop):
         data = data.to(device=device)
@@ -46,42 +53,46 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses, train_dice_sc
             loss = loss_fn(predictions, targets)
         # backward
         optimizer.zero_grad()
+        
+        # print(f'type(loss): {type(loss)}, shape: {loss.shape}')
+        # print(f'loss: {loss.item()}')
+        
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
         losses.append(loss.item())
-        dice = 1 - loss.item() # dice loss = 1 - dice score
-        train_dice_scores.append(dice)
         
         # update tqdm loop
-        loop.set_postfix(loss=loss.item(), dice_score=dice)
+        loop.set_postfix(loss=loss.item())
 
 def main():
-    train_transform = A.Compose([
-        A.Resize(height=IMAGE_HEIGHT, width=IMAGE_WIDTH),
-        # Could add more transforms here
-        A.Normalize(mean=[0.0, 0.0, 0.0], std=[1.0, 1.0, 1.0], max_pixel_value=255.0),
-        ToTensorV2()
-    ])
-    validation_transform = A.Compose([
-        A.Resize(height=IMAGE_HEIGHT, width=IMAGE_WIDTH),
-        A.Normalize(mean=[0.0, 0.0, 0.0], std=[1.0, 1.0, 1.0], max_pixel_value=255.0),
-        ToTensorV2()
-    ])
-    
-    # create the dataloaders 
-    train_set = ISICDataset(TRAIN_IMG_DIR, TRAIN_MASK_DIR, transform=train_transform)
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=NUM_WORKERS)
-    
-    validation_set = ISICDataset(VAL_IMG_DIR, VAL_MASK_DIR, transform=validation_transform)
-    val_loader = DataLoader(validation_set, batch_size=1, shuffle=False, num_workers=NUM_WORKERS)
+    images_path = os.path.join(base_path, dataset, 'images')
+    labels_path = os.path.join(base_path, dataset, 'labels')
+
+    image_files = sorted([os.path.join(images_path, f) for f in os.listdir(images_path) if f.endswith('.tif')])
+    label_files = sorted([os.path.join(labels_path, f) for f in os.listdir(labels_path) if f.endswith('.tif')])
+
+    train_image_files, val_image_files, train_mask_files, val_mask_files = train_test_split(
+        image_files, label_files, test_size=0.2, random_state=42)
+
+    train_dataset = CustomDataset(train_image_files, train_mask_files, augmentation_transforms=augment_image)
+    val_dataset = CustomDataset(val_image_files, val_mask_files, augmentation_transforms=augment_image)
+
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
     
     # 3 channels in for RGB images, 1 channel out for binary mask
     model = ImprovedUNet(in_channels=3, out_channels=1).to(device)
-    loss_fn = BinaryDiceLoss() # Binary Dice Loss from https://github.com/hubutui/DiceLoss-PyTorch see dice_loss.py
+    
+    # loss_fn = torch.nn.BCEWithLogitsLoss()
+    # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
+    loss_fn = EpicLoss() # Custom loss
+    # loss_fn = IoULoss() # Testing this loss function
+    # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
+    
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True, factor=0.1)
     
     # load model if LOAD_MODEL is True
     if LOAD_MODEL:
@@ -91,7 +102,6 @@ def main():
     
     losses = [] # all training losses
     dice_scores = [] # for plotting
-    train_dice_scores = [] # for plotting
     epoch_losses = [] # average loss for each epoch
     
     model.train()
@@ -101,20 +111,22 @@ def main():
     for epoch in range(NUM_EPOCHS):
         train_epoch_losses = [] # train losses for the epoch
         # Train the model for one epoch
-        train_epoch(train_loader, model, optimizer, loss_fn, scaler, train_epoch_losses, train_dice_scores)
+        train_epoch(train_loader, model, optimizer, loss_fn, scaler, train_epoch_losses)
         
         # Calculate the average loss for the epoch
-        epoch_losses.append(np.mean(train_epoch_losses))
+        average_loss = np.mean(train_epoch_losses)
+        epoch_losses.append(average_loss)
         losses.extend(train_epoch_losses)
         
         # Update the learning rate
         scheduler.step(epoch_losses[-1])
         
         # Calculate the validation dice score after each epoch
-        val_dice_score = calc_dice_score(model, val_loader, device=device)
+        val_dice_score = evaluate(model, val_loader, device=device, verbose=True, leave_on_train=True)
         val_dice_score = np.round(val_dice_score.item(), 4)
         dice_scores.append(val_dice_score)
         print(f'Validation dice score: {val_dice_score}')
+        print(f'Average epoch loss: {average_loss:.4f}')
             
         # Print some feedback after each epoch
         print_progress(start_time, epoch, NUM_EPOCHS)
@@ -148,16 +160,6 @@ def main():
     plt.title('Training Losses')
     plt.grid(True)
     plt.savefig('save_data/losses.png')
-    plt.show()
-    
-    # plot the training dice scores
-    plt.figure(figsize=(20, 10))
-    plt.plot(train_dice_scores, label='Dice Score')
-    plt.xlabel('Batch #')
-    plt.ylabel('Dice Score')
-    plt.grid(True)
-    plt.title('Training Dice Scores')
-    plt.savefig('save_data/train_dice_scores.png')
     plt.show()
     
     # plot Average Losses per Epoch
