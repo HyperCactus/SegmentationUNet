@@ -14,6 +14,7 @@ import time
 from tqdm import tqdm
 import torch
 import torch.nn as nn
+from costom_loss import IoULoss
 
 # The below class is from https://github.com/hubutui/DiceLoss-PyTorch and was modified
 # It is a loss function based on the Dice score.
@@ -57,7 +58,8 @@ class BinaryDiceScore(nn.Module):
             raise Exception('Unexpected reduction {}'.format(self.reduction))
 
 def evaluate(model, loader, device='cuda', criterion=None,
-             threshold=0.5, verbose=False, leave_on_train=False):
+             threshold=0.5, verbose=False, leave_on_train=False,
+             score_type='dice'):
     """
     Calculates the average dice score over the entire dataloader
     """
@@ -65,6 +67,8 @@ def evaluate(model, loader, device='cuda', criterion=None,
     
     model.eval()
     dice_scores = []
+    iou_scores = []
+    iou_loss = IoULoss()
     criterion = BinaryDiceScore() if criterion is None else criterion
     loop = tqdm(loader) if verbose else loader
     
@@ -75,12 +79,18 @@ def evaluate(model, loader, device='cuda', criterion=None,
             preds = model(x)
             preds = (preds > threshold).float() # convert to binary mask
             dice_scores.append(criterion(preds, y).item())
+            iou_scores.append(1 - iou_loss(preds, y).item())
     if leave_on_train:
         model.train()
     
     mean_dice_score = np.mean(dice_scores)
-    return mean_dice_score
-
+    mean_iou_score = np.mean(iou_scores)
+    if score_type == 'dice':
+        return mean_dice_score
+    elif score_type == 'iou':
+        return mean_iou_score
+    elif score_type == 'both':
+        return mean_dice_score, mean_iou_score
 
 def save_checkpoint(state, filename='checkpoints/checkpoint.pth.tar'):
     """

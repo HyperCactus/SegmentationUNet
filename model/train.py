@@ -4,15 +4,11 @@ This file is the main training script for the Improved UNet model
 # Copied from COMP3710 report
 
 import torch
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
 import numpy as np
-from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from modules import ImprovedUNet
-from dataset import CustomDataset, augment_image
-from sklearn.model_selection import train_test_split
+from dataset import TRAIN_LOADER, VAL_LOADER
 import time
 from utils import *
 from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss
@@ -23,11 +19,8 @@ from global_params import * # Hyperparameters and other global variables
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-
-
-
 LOAD_MODEL = True
-SAVE_EPOCH_DATA = False#True
+SAVE_EPOCH_DATA = True
 
 def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
     """Trains the model for one epoch
@@ -65,22 +58,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
         # update tqdm loop
         loop.set_postfix(loss=loss.item())
 
-def main():
-    images_path = os.path.join(base_path, dataset, 'images')
-    labels_path = os.path.join(base_path, dataset, 'labels')
-
-    image_files = sorted([os.path.join(images_path, f) for f in os.listdir(images_path) if f.endswith('.tif')])
-    label_files = sorted([os.path.join(labels_path, f) for f in os.listdir(labels_path) if f.endswith('.tif')])
-
-    train_image_files, val_image_files, train_mask_files, val_mask_files = train_test_split(
-        image_files, label_files, test_size=0.2, random_state=42)
-
-    train_dataset = CustomDataset(train_image_files, train_mask_files, augmentation_transforms=augment_image)
-    val_dataset = CustomDataset(val_image_files, val_mask_files, augmentation_transforms=augment_image)
-
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
-    
+def main():    
     # 3 channels in for RGB images, 1 channel out for binary mask
     model = ImprovedUNet(in_channels=3, out_channels=1).to(device)
     
@@ -111,7 +89,7 @@ def main():
     for epoch in range(NUM_EPOCHS):
         train_epoch_losses = [] # train losses for the epoch
         # Train the model for one epoch
-        train_epoch(train_loader, model, optimizer, loss_fn, scaler, train_epoch_losses)
+        train_epoch(TRAIN_LOADER, model, optimizer, loss_fn, scaler, train_epoch_losses)
         
         # Calculate the average loss for the epoch
         average_loss = np.mean(train_epoch_losses)
@@ -122,7 +100,7 @@ def main():
         scheduler.step(epoch_losses[-1])
         
         # Calculate the validation dice score after each epoch
-        val_dice_score = evaluate(model, val_loader, device=device, verbose=True, leave_on_train=True)
+        val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)
         val_dice_score = np.round(val_dice_score.item(), 4)
         dice_scores.append(val_dice_score)
         print(f'Validation dice score: {val_dice_score}')
@@ -137,7 +115,7 @@ def main():
             os.makedirs(f'epoch_data/epoch_{epoch}', exist_ok=True)
             os.makedirs(f'epoch_data/epoch_{epoch}/checkpoints', exist_ok=True)
             os.makedirs(f'epoch_data/epoch_{epoch}/images', exist_ok=True)
-            save_predictions_as_imgs(val_loader, model, 10, folder=f'epoch_data/epoch_{epoch}/images/', device=device)
+            save_predictions_as_imgs(VAL_LOADER, model, 10, folder=f'epoch_data/epoch_{epoch}/images/', device=device)
             # Save a checkpoint after each epoch
             checkpoint = {
                 'state_dict': model.state_dict(),

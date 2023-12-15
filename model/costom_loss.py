@@ -30,7 +30,27 @@ class FocalLoss(nn.modules.loss._WeightedLoss):
         balanced_focal_loss = self.balance_param * focal_loss
         return balanced_focal_loss
 
+class IslandLoss(nn.Module):
+    """
+    A loss function that penalizes the model for predicting more or fewer 
+    islands of pixels then are present in the mask.
+    """
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+    
+    def forward(self, prediction, targets, smooth=1):
+        
+        # an island is a group of white pixels, (pixels with value of 1) that are connected
+        # islands are separated by black pixels (pixels with value of 0)
+        # we will need to use a clever algorithm to find the number of islands in the mask
+        pass
+        
 
+def calc_islands(mask):
+    """
+    Calculates the number of islands in the mask
+    """
+    pass
 
 
 # Intersection over Union (IoU) loss

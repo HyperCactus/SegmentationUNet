@@ -45,8 +45,6 @@ from sklearn.model_selection import train_test_split
 
 # show_images([first_image, first_label], titles=['First Image', 'First Label'])
 
-# _ = input("Press [enter] to continue.")
-
 class CustomDataset(Dataset):
     def __init__(self, image_files, mask_files, 
                  input_size=(IMAGE_WIDTH, IMAGE_HEIGHT), 
@@ -105,17 +103,16 @@ def augment_image(image, mask):
         A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
-        A.ShiftScaleRotate(scale_limit=0.5, rotate_limit=0, shift_limit=0.1, p=1, border_mode=0),
-        # A.RandomBrightness(p=1),
-        A.RandomBrightnessContrast(p=1),
+        A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=15, shift_limit=0.1, p=0.8, border_mode=0),
+        A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
         A.OneOf(
             [
                 A.Blur(blur_limit=3, p=1),
                 A.MotionBlur(blur_limit=3, p=1),
             ],
-            p=0.9,
+            p=0.7,
         ),
-    
+        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
     ])
 
     augmented = transform(image=image_np, mask=mask_np)
@@ -126,13 +123,14 @@ def augment_image(image, mask):
 
     return augmented_image, augmented_mask
 
-def val_augment_image(image, mask):
+def val_transform(image, mask):
     
     image_np = image.permute(1, 2, 0).numpy()
     mask_np = mask.numpy()
 
     transform = A.Compose([
         A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
+        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
     ])
 
     augmented = transform(image=image_np, mask=mask_np)
@@ -145,22 +143,67 @@ def val_augment_image(image, mask):
 
 
 #-------------------------- Test the dataset --------------------------#
+image_files = []
+label_files = []
+for dataset in datasets:
+    images_path = os.path.join(base_path, dataset, 'images')
+    labels_path = os.path.join(base_path, dataset, 'labels')
+
+    image_files.extend(sorted([os.path.join(images_path, f) for f in os.listdir(images_path) if f.endswith('.tif')]))
+    label_files.extend(sorted([os.path.join(labels_path, f) for f in os.listdir(labels_path) if f.endswith('.tif')]))
+
 # images_path = os.path.join(base_path, dataset, 'images')
 # labels_path = os.path.join(base_path, dataset, 'labels')
 
 # image_files = sorted([os.path.join(images_path, f) for f in os.listdir(images_path) if f.endswith('.tif')])
 # label_files = sorted([os.path.join(labels_path, f) for f in os.listdir(labels_path) if f.endswith('.tif')])
 
-# train_image_files, val_image_files, train_mask_files, val_mask_files = train_test_split(
-#     image_files, label_files, test_size=0.2, random_state=42)
+train_image_files, val_image_files, train_mask_files, val_mask_files = train_test_split(
+    image_files, label_files, test_size=0.1, random_state=42)
 
-# train_dataset = CustomDataset(train_image_files, train_mask_files, augmentation_transforms=augment_image)
-# val_dataset = CustomDataset(val_image_files, val_mask_files, augmentation_transforms=augment_image)
+train_dataset = CustomDataset(train_image_files, train_mask_files, augmentation_transforms=augment_image)
+val_dataset = CustomDataset(val_image_files, val_mask_files, augmentation_transforms=val_transform)
+test_of_dataset = CustomDataset(train_image_files, train_mask_files, augmentation_transforms=None)
 
-# train_dataloader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-# val_dataloader = DataLoader(val_dataset, batch_size=8, shuffle=False)
+TRAIN_LOADER = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+VAL_LOADER = DataLoader(val_dataset, batch_size=1, shuffle=False)
+testing_loader = DataLoader(test_of_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-# for batch_idx, (batch_images, batch_masks) in enumerate(train_dataloader):
+# for batch_idx, (batch_images, batch_masks) in enumerate(testing_loader):
+#     print("Batch", batch_idx + 1)
+#     print("Image batch shape:", batch_images.shape)
+#     print("Mask batch shape:", batch_masks.shape)
+
+
+# for batch_idx, (batch_images, batch_masks) in enumerate(TRAIN_LOADER):
+#     print("Batch", batch_idx + 1)
+#     print("Image batch shape:", batch_images.shape)
+#     print("Mask batch shape:", batch_masks.shape)
+    
+#     for image, mask, image_path, mask_path in zip(batch_images, batch_masks, train_image_files, train_mask_files):
+       
+#         image = image.permute((1, 2, 0)).numpy()*255.0
+#         image = image.astype('uint8')
+#         mask = (mask*255).numpy().astype('uint8')
+        
+#         image_filename = os.path.basename(image_path)
+#         mask_filename = os.path.basename(mask_path)
+        
+#         plt.figure(figsize=(15, 10))
+        
+#         plt.subplot(2, 4, 1)
+#         plt.imshow(image, cmap='gray')
+#         plt.title(f"Original Image - {image_filename}")
+        
+#         plt.subplot(2, 4, 2)
+#         plt.imshow(mask, cmap='gray')
+#         plt.title(f"Mask Image - {mask_filename}")
+        
+#         plt.tight_layout()
+#         plt.show()
+#     break
+
+# for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
 #     print("Batch", batch_idx + 1)
 #     print("Image batch shape:", batch_images.shape)
 #     print("Mask batch shape:", batch_masks.shape)
