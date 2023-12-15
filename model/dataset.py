@@ -169,7 +169,7 @@ TRAIN_LOADER = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 VAL_LOADER = DataLoader(val_dataset, batch_size=1, shuffle=False)
 testing_loader = DataLoader(test_of_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
-# for batch_idx, (batch_images, batch_masks) in enumerate(testing_loader):
+# for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
 #     print("Batch", batch_idx + 1)
 #     print("Image batch shape:", batch_images.shape)
 #     print("Mask batch shape:", batch_masks.shape)

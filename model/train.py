@@ -11,6 +11,7 @@ from modules import ImprovedUNet
 from dataset import TRAIN_LOADER, VAL_LOADER
 import time
 from utils import *
+from torch.utils.tensorboard import SummaryWriter
 from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss
 from global_params import * # Hyperparameters and other global variables
 # from dice_loss import BinaryDiceLoss
@@ -21,6 +22,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 LOAD_MODEL = True
 SAVE_EPOCH_DATA = True
+
+writer = SummaryWriter('runs/SenNet/VascularSegmentation')
+step = 0
 
 def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
     """Trains the model for one epoch
@@ -54,11 +58,13 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
         scaler.step(optimizer)
         scaler.update()
         losses.append(loss.item())
+        writer.add_scalar('train_batch_loss', loss.item(), step)
+        step += 1
         
         # update tqdm loop
         loop.set_postfix(loss=loss.item())
 
-def main():    
+def train():    
     # 3 channels in for RGB images, 1 channel out for binary mask
     model = ImprovedUNet(in_channels=3, out_channels=1).to(device)
     
@@ -161,4 +167,4 @@ def main():
     plt.show()
 
 if __name__ == '__main__':
-    main()
+    train()
