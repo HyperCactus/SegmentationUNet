@@ -351,3 +351,17 @@ def print_progress(start_time, epoch, num_epochs):
     print(f"""Epoch [{epoch+1}/{num_epochs}] completed. Time elapsed: {elapsed_time}. 
           seconds. Time remaining: {days:.0f} days, {hours:.0f} hours, 
           {minutes:.0f} minutes.""")
+
+
+
+def dice_coeff(prediction, target, threshold=0.5):
+
+    mask = np.zeros_like(prediction)
+    mask[prediction >= threshold] = 1
+
+    inter = np.sum(mask * target)
+    union = np.sum(mask) + np.sum(target)
+    epsilon = 1e-6
+    result = np.mean(2 * inter / (union + epsilon))
+    return result
+

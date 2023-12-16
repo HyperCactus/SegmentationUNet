@@ -21,7 +21,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 LOAD_MODEL = True
-SAVE_EPOCH_DATA = True
+SAVE_EPOCH_DATA = False#True
 
 writer = SummaryWriter('runs/SenNet/VascularSegmentation')
 step = 0

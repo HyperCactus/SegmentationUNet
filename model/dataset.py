@@ -175,33 +175,33 @@ testing_loader = DataLoader(test_of_dataset, batch_size=BATCH_SIZE, shuffle=True
 #     print("Mask batch shape:", batch_masks.shape)
 
 
-# for batch_idx, (batch_images, batch_masks) in enumerate(TRAIN_LOADER):
-#     print("Batch", batch_idx + 1)
-#     print("Image batch shape:", batch_images.shape)
-#     print("Mask batch shape:", batch_masks.shape)
+for batch_idx, (batch_images, batch_masks) in enumerate(TRAIN_LOADER):
+    print("Batch", batch_idx + 1)
+    print("Image batch shape:", batch_images.shape)
+    print("Mask batch shape:", batch_masks.shape)
     
-#     for image, mask, image_path, mask_path in zip(batch_images, batch_masks, train_image_files, train_mask_files):
+    for image, mask, image_path, mask_path in zip(batch_images, batch_masks, train_image_files, train_mask_files):
        
-#         image = image.permute((1, 2, 0)).numpy()*255.0
-#         image = image.astype('uint8')
-#         mask = (mask*255).numpy().astype('uint8')
+        image = image.permute((1, 2, 0)).numpy()*255.0
+        image = image.astype('uint8')
+        mask = (mask*255).numpy().astype('uint8')
         
-#         image_filename = os.path.basename(image_path)
-#         mask_filename = os.path.basename(mask_path)
+        image_filename = os.path.basename(image_path)
+        mask_filename = os.path.basename(mask_path)
         
-#         plt.figure(figsize=(15, 10))
+        plt.figure(figsize=(15, 10))
         
-#         plt.subplot(2, 4, 1)
-#         plt.imshow(image, cmap='gray')
-#         plt.title(f"Original Image - {image_filename}")
+        plt.subplot(2, 4, 1)
+        plt.imshow(image, cmap='gray')
+        plt.title(f"Original Image - {image_filename}")
         
-#         plt.subplot(2, 4, 2)
-#         plt.imshow(mask, cmap='gray')
-#         plt.title(f"Mask Image - {mask_filename}")
+        plt.subplot(2, 4, 2)
+        plt.imshow(mask, cmap='gray')
+        plt.title(f"Mask Image - {mask_filename}")
         
-#         plt.tight_layout()
-#         plt.show()
-#     break
+        plt.tight_layout()
+        plt.show()
+    break
 
 # for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
 #     print("Batch", batch_idx + 1)

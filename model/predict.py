@@ -11,10 +11,11 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
+from global_params import *
 import albumentations as A
 from utils import *
 from modules import ImprovedUNet
-from dataset import CustomDataset, augment_image
+from dataset import VAL_LOADER, TRAIN_LOADER
 
 
 
@@ -34,45 +35,42 @@ def rle_encode(img):
         rle = '1 0'
     return rle
 
-def remove_small_objects(img, min_size):
-    # Find all connected components (labels)
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img, connectivity=8)
 
-    # Create a mask where small objects are removed
-    new_img = np.zeros_like(img)
-    for label in range(1, num_labels):
-        if stats[label, cv2.CC_STAT_AREA] >= min_size:
-            new_img[labels == label] = 1
+def main():
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    model = ImprovedUNet(in_channels=3, out_channels=1).to(device=device)
+    load_checkpoint(torch.load(CHECKPOINT_DIR), model)
+    model.eval()
+    
+    
+    rles = []
+    pbar = tqdm(enumerate(VAL_LOADER), total=len(VAL_LOADER), desc='Inference ')
+    for step, (images, shapes) in pbar:
+        shapes = shapes.numpy()
+        images = images.to(device, dtype=torch.float)
+        with torch.no_grad():
+            preds = model(images)
+            preds = (nn.Sigmoid()(preds)>0.5).double()
+        preds = preds.cpu().numpy().astype(np.uint8)
 
-    return new_img
-
-rles = []
-pbar = tqdm(enumerate(test_loader), total=len(test_loader), desc='Inference ')
-for step, (images, shapes) in pbar:
-    shapes = shapes.numpy()
-    images = images.to(CFG.device, dtype=torch.float)
-    with torch.no_grad():
-        preds = model(images)
-        preds = (nn.Sigmoid()(preds)>0.5).double()
-    preds = preds.cpu().numpy().astype(np.uint8)
-
-    for pred, shape in zip(preds, shapes):
-        pred = cv2.resize(pred[0], (shape[1], shape[0]), cv2.INTER_NEAREST)
-        # pred = remove_small_objects(pred, 10)
-        rle = rle_encode(pred)
-        rles.append(rle)
+        for pred, shape in zip(preds, shapes):
+            pred = cv2.resize(pred[0], (shape[1], shape[0]), cv2.INTER_NEAREST)
+            # pred = remove_small_objects(pred, 10)
+            rle = rle_encode(pred)
+            rles.append(rle)
 
 
-ids = []
-for p_img in tqdm(ls_images):
-    path_ = p_img.split(os.path.sep)
-    # parse the submission ID
-    dataset = path_[-3]
-    slice_id, _ = os.path.splitext(path_[-1])
-    ids.append(f"{dataset}_{slice_id}")
+    ids = []
+    for p_img in tqdm(ls_images):
+        path_ = p_img.split(os.path.sep)
+        # parse the submission ID
+        dataset = path_[-3]
+        slice_id, _ = os.path.splitext(path_[-1])
+        ids.append(f"{dataset}_{slice_id}")
 
-submission = pd.DataFrame.from_dict({
-    "id": ids,
-    "rle": rles
-})
-submission.to_csv("submission.csv", index=False)
+    submission = pd.DataFrame.from_dict({
+        "id": ids,
+        "rle": rles
+    })
+    submission.to_csv("submission.csv", index=False)

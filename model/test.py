@@ -32,6 +32,6 @@ from glob import glob
 # loss = torch.abs(1 - (ones_in_pred / ones_in_mask))
 # print(f'loss: {loss}')
 
-DATASET_FOLDER = "/data"
+DATASET_FOLDER = "data/kidney_1_dense"
 ls_images = glob(os.path.join(DATASET_FOLDER, "test", "*", "*", "*.tif"))
 print(f"found images: {len(ls_images)}")
