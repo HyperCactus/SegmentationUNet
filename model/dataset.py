@@ -74,12 +74,14 @@ class CustomDataset(Dataset):
 def preprocess_image(path):
     
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    print(f'fresh process image img.shape: {img.shape}')
     img = np.tile(img[...,None],[1, 1, 3]) 
     img = img.astype('float32') 
     mx = np.max(img)
     if mx:
         img/=mx 
-        
+    
+    print(f'process image img.shape: {img.shape}')
     img = np.transpose(img, (2, 0, 1))
     img_ten = torch.tensor(img)
     return img_ten
@@ -161,13 +163,18 @@ for dataset in datasets:
 train_image_files, val_image_files, train_mask_files, val_mask_files = train_test_split(
     image_files, label_files, test_size=0.1, random_state=42)
 
+testing_path = 'data_downsampled512/train/test_output'
+testing_img_files = sorted([os.path.join(testing_path, 'images', f) for f in os.listdir(testing_path+'/images') if f.endswith('.tif')])
+testing_mask_files = sorted([os.path.join(testing_path, 'labels', f) for f in os.listdir(testing_path+'/labels') if f.endswith('.tif')])
+# testing_mask_files = train_mask_files[:len(testing_img_files)]
+
 train_dataset = CustomDataset(train_image_files, train_mask_files, augmentation_transforms=augment_image)
 val_dataset = CustomDataset(val_image_files, val_mask_files, augmentation_transforms=val_transform)
-test_of_dataset = CustomDataset(train_image_files, train_mask_files, augmentation_transforms=None)
+test_of_dataset = CustomDataset(testing_img_files, testing_mask_files, augmentation_transforms=val_transform)
 
 TRAIN_LOADER = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 VAL_LOADER = DataLoader(val_dataset, batch_size=1, shuffle=False)
-testing_loader = DataLoader(test_of_dataset, batch_size=BATCH_SIZE, shuffle=True)
+testing_loader = DataLoader(test_of_dataset, batch_size=1, shuffle=True)
 
 # for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
 #     print("Batch", batch_idx + 1)
@@ -175,7 +182,7 @@ testing_loader = DataLoader(test_of_dataset, batch_size=BATCH_SIZE, shuffle=True
 #     print("Mask batch shape:", batch_masks.shape)
 
 
-for batch_idx, (batch_images, batch_masks) in enumerate(TRAIN_LOADER):
+for batch_idx, (batch_images, batch_masks) in enumerate(testing_loader):
     print("Batch", batch_idx + 1)
     print("Image batch shape:", batch_images.shape)
     print("Mask batch shape:", batch_masks.shape)
