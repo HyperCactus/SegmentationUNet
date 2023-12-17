@@ -24,7 +24,7 @@ LOAD_MODEL = True
 SAVE_EPOCH_DATA = False#True
 
 writer = SummaryWriter('runs/SenNet/VascularSegmentation')
-step = 0
+STEP = 0
 
 def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
     """Trains the model for one epoch
@@ -58,8 +58,9 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
         scaler.step(optimizer)
         scaler.update()
         losses.append(loss.item())
-        writer.add_scalar('train_batch_loss', loss.item(), step)
-        step += 1
+        global STEP
+        writer.add_scalar('train_batch_loss', loss.item(), STEP)
+        STEP += 1
         
         # update tqdm loop
         loop.set_postfix(loss=loss.item())
