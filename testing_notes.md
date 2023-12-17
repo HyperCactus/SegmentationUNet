@@ -47,4 +47,4 @@ validation dice score = 0.6541
 * dataset compressed, no mask files, need to use RLE masks
 * Need to redo dataset, this one does something stupid with channels
 * ToDo: Integrate TensorBoard for testing on rangpur
-* To remove extra channels in image import use ` image = cv2.imread('image.tif', cv2.CV_LOAD_IMAGE_GRAYSCALE)` ps " looks like cv2.IMREAD_GRAYSCALE is the way to go these days instead of cv2.CV_LOAD_IMAGE_GRAYSCALE "
+* To remove extra channels in image import use ` image = cv2.imread('image.tif', cv2.CV_LOAD_IMAGE_GRAYSCALE)` ps " looks like cv2.IMREAD_GRAYSCALE is the way to go these days instead of cv2.CV_LOAD_IMAGE_GRAYSCALE" just look [here](https://stackoverflow.com/questions/18870603/in-opencv-python-why-am-i-getting-3-channel-images-from-a-grayscale-image)
