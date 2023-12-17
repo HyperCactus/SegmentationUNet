@@ -30,5 +30,5 @@ VAL_MASK_DIR = 'data/ISIC_2017_downsampled/val/masks'
 
 base_path = 'data/train'
 # base_path = 'data_downsampled512/train'
-dataset = 'kidney_1_dense'
+# dataset = 'kidney_1_dense'
 datasets = ['kidney_1_dense', 'kidney_1_voi', 'kidney_2', 'kidney_3_sparse']
