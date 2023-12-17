@@ -24,7 +24,7 @@ from evaluate import main as evaluate_fn
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-LOAD_MODEL = True
+LOAD_MODEL = False#True
 SAVE_EPOCH_DATA = False#True
 
 writer = SummaryWriter('runs/SenNet/VascularSegmentation')
