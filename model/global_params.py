@@ -5,7 +5,7 @@ Global parameters for the UNet model defined here for easy access across files.
 
 # Hyperparameters
 LEARNING_RATE = 1e-4
-BATCH_SIZE = 16
+BATCH_SIZE = 4
 NUM_EPOCHS = 1
 NUM_WORKERS = 4
 PIN_MEMORY = True
