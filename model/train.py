@@ -23,6 +23,12 @@ from evaluate import main as evaluate_fn
 # set the device to cuda if available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# for HPC
+if not torch.cuda.is_available():
+    # stop the script if GPU is not available
+    print('GPU not available')
+    exit()
+
 
 LOAD_MODEL = False#True
 SAVE_EPOCH_DATA = False#True
