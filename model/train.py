@@ -14,6 +14,10 @@ from utils import *
 from torch.utils.tensorboard import SummaryWriter
 from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss
 from global_params import * # Hyperparameters and other global variables
+
+# RANGPUR Settings 
+from evaluate import main as evaluate_fn
+
 # from dice_loss import BinaryDiceLoss
 
 # set the device to cuda if available
@@ -136,6 +140,8 @@ def train():
         'optimizer': optimizer.state_dict()
     }
     save_checkpoint(checkpoint)
+    
+    evaluate_fn()
         
     # Plot the losses
     plt.figure(figsize=(20, 10))
@@ -145,7 +151,7 @@ def train():
     plt.title('Training Losses')
     plt.grid(True)
     plt.savefig('save_data/losses.png')
-    plt.show()
+    # plt.show()
     
     # plot Average Losses per Epoch
     plt.figure(figsize=(20, 10))
@@ -155,7 +161,7 @@ def train():
     plt.title('Average Losses per Epoch')
     plt.grid(True)
     plt.savefig('save_data/epoch_losses.png')
-    plt.show()
+    # plt.show()
     
     # plot dice score vs epoch
     plt.figure(figsize=(20, 10))
@@ -165,7 +171,7 @@ def train():
     plt.title('Validation Dice Scores')
     plt.grid(True)
     plt.savefig('save_data/dice_scores.png')
-    plt.show()
+    # plt.show()
 
 if __name__ == '__main__':
     train()

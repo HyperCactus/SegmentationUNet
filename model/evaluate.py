@@ -16,10 +16,6 @@ from global_params import *
 # set the device to cuda if available
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-BATCH_SIZE = 1 # We want to test one image at a time
-NUM_WORKERS = 1
-CHECKPOINT_DIR = 'checkpoints/checkpoint.pth.tar'
-
 def main():
     model = ImprovedUNet(in_channels=3, out_channels=1).to(device=device)
     load_checkpoint(torch.load(CHECKPOINT_DIR), model)
