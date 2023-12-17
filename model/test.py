@@ -36,4 +36,7 @@ from glob import glob
 # ls_images = glob(os.path.join(DATASET_FOLDER, "test", "*", "*", "*.tif"))
 # print(f"found images: {len(ls_images)}")
 
-print(os.getcwd())
+# print(os.getcwd())
+
+import torch
+torch.zeros(1).cuda()
