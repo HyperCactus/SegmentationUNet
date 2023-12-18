@@ -48,3 +48,6 @@ validation dice score = 0.6541
 * Need to redo dataset, this one does something stupid with channels
 * ToDo: Integrate TensorBoard for testing on rangpur
 * To remove extra channels in image import use ` image = cv2.imread('image.tif', cv2.CV_LOAD_IMAGE_GRAYSCALE)` ps " looks like cv2.IMREAD_GRAYSCALE is the way to go these days instead of cv2.CV_LOAD_IMAGE_GRAYSCALE" just look [here](https://stackoverflow.com/questions/18870603/in-opencv-python-why-am-i-getting-3-channel-images-from-a-grayscale-image)
+* fix cuda problem on rangpur? ...  CUDA 10.2
+`conda install pytorch==1.12.0 torchvision==0.13.0 torchaudio==0.12.0 cudatoolkit=10.2 -c pytorch`
+* Downgrading python version on Rangpur, original version = Python 3.11.4, new version = Python 3.7.1
