@@ -8,6 +8,10 @@ if torch.cuda.is_available():
 else:
     print('cuda is NOT available')
 
-x = torch.zeros(1).to('cuda')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+x = torch.zeros(1)
+print(f'x on cpu: {x}')
+x = x.to(device)
+print(f'x on {device}: {x}')
 
 print('Success')
