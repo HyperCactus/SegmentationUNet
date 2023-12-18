@@ -51,3 +51,4 @@ validation dice score = 0.6541
 * fix cuda problem on rangpur? ...  CUDA 10.2
 `conda install pytorch==1.12.0 torchvision==0.13.0 torchaudio==0.12.0 cudatoolkit=10.2 -c pytorch`
 * Downgrading python version on Rangpur, original version = Python 3.11.4, new version = Python 3.7.1
+* Start recording train time as well, could try loading entire downsampled dataset into memory to speed up training
