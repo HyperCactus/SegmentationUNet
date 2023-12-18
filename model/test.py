@@ -8,6 +8,6 @@ if torch.cuda.is_available():
 else:
     print('cuda is NOT available')
 
-# torch.zeros(1).cuda()
+x = torch.zeros(1).cuda()
 
 print('Success')
