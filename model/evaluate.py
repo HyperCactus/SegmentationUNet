@@ -10,7 +10,6 @@ from modules import ImprovedUNet
 from torch.utils.data import DataLoader
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-from sklearn.model_selection import train_test_split
 from global_params import *
 
 # set the device to cuda if available
