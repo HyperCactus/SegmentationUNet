@@ -53,3 +53,5 @@ validation dice score = 0.6541
 * Downgrading python version on Rangpur, original version = Python 3.11.4, new version = Python 3.7.1
 * Start recording train time as well, could try loading entire downsampled dataset into memory to speed up training
 * Now running successfully on Rangpur!, ToDo: hpyerparamiter search, 3D upgrade, TTA, surface dice evaluation, better loss function
+* Trained on Rangpur for 30 epochs with downsampled dataset
+validation dice score = 0.7964

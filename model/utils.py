@@ -4,6 +4,8 @@ Some helper functions for visualization, saving/loading checkpoints and calculat
 # Copied from COMP3710 report
 
 import numpy as np
+import pandas as pd
+import cv2
 from PIL import Image
 import torch
 import matplotlib.pyplot as plt
@@ -15,6 +17,7 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 from costom_loss import IoULoss
+from global_params import *
 
 # The below class is from https://github.com/hubutui/DiceLoss-PyTorch and was modified
 # It is a loss function based on the Dice score.
@@ -365,3 +368,98 @@ def dice_coeff(prediction, target, threshold=0.5):
     result = np.mean(2 * inter / (union + epsilon))
     return result
 
+
+# The below functions are from https://www.kaggle.com/code/jirkaborovec/sennet-hoa-rle-decode-encode-demo-submission
+
+def rle_decode(mask_rle: str, img_shape: tuple = None) -> np.ndarray:
+    seq = mask_rle.split()
+    starts = np.array(list(map(int, seq[0::2])))
+    lengths = np.array(list(map(int, seq[1::2])))
+    assert len(starts) == len(lengths)
+    ends = starts + lengths
+    img = np.zeros((np.product(img_shape),), dtype=np.uint8)
+    for begin, end in zip(starts, ends):
+        img[begin:end] = 1
+    # https://stackoverflow.com/a/46574906/4521646
+    img.shape = img_shape
+    return img
+
+
+def rle_encode(mask, bg = 0) -> dict:
+    vec = mask.flatten()
+    nb = len(vec)
+    where = np.flatnonzero
+    starts = np.r_[0, where(~np.isclose(vec[1:], vec[:-1], equal_nan=True)) + 1]
+    lengths = np.diff(np.r_[starts, nb])
+    values = vec[starts]
+    assert len(starts) == len(lengths) == len(values)
+    rle = []
+    for start, length, val in zip(starts, lengths, values):
+        if val == bg:
+            continue
+        rle += [str(start), length]
+    # post-processing
+    return " ".join(map(str, rle))
+
+def create_rle_df(kidney_dirs: [str], 
+                  subdir_name: str = 'preds',
+                  img_size=(512, 512)):
+    """
+    Creates a dataframe with the image ids and the predicted masks
+    """
+    if type(kidney_dirs) == str:
+        kidney_dirs = [kidney_dirs]
+    
+    df = pd.DataFrame(columns=['id', 'rle'])
+    df.set_index('id', inplace=True)
+        
+    for kidney_dir in kidney_dirs:
+        assert os.path.exists(kidney_dir), f'{kidney_dir} does not exist'
+        
+        kidney_name = os.path.basename(kidney_dir)
+        masks = sorted([os.path.join(kidney_dir, f) for f in 
+                        os.listdir(os.path.join(kidney_dir, subdir_name)) if f.endswith('.tif')])
+        
+        for mask_file in masks:
+            mask_name = os.path.basename(mask_file)
+            mask = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
+            # ToDo: rezise the mask in a smart way
+            
+            df[f'{kidney_name}_{mask_name[:-4]}'] = rle_encode(rle_decode(mask, img_shape=img_size))
+    
+    return df
+
+def save_predictions(kidney_dirs, model, num='all', 
+                     folder='saved_images/', device='cuda', 
+                     verbose=True):
+    """
+    Saves the predictions from the model as images in the folder
+    """
+    if type(kidney_dirs) == str:
+        kidney_dirs = [kidney_dirs]
+    
+    preds_path = f'{folder}preds/'
+    masks_path = f'{folder}labels/'
+    orig_path = f'{folder}images/'
+    os.makedirs(preds_path, exist_ok=True)
+    os.makedirs(masks_path, exist_ok=True)
+    os.makedirs(orig_path, exist_ok=True)
+    
+    loader
+    
+    model.eval()
+    print('>>> Generating and saving predictions') if verbose else None
+    loop = tqdm(enumerate(loader), total=num, leave=False) if verbose else enumerate(loader)
+    with torch.no_grad():
+        # for idx, (x, y) in enumerate(loader):
+        for idx, (x, y) in loop:
+            x = x.to(device)
+            y = y.to(device) # add 1 channel to mask
+            preds = torch.sigmoid(model(x))
+            preds = (preds > PREDICTION_THRESHOLD).float()
+            torchvision.utils.save_image(preds, f'{preds_path}pred_{idx+1}.png')
+            torchvision.utils.save_image(y.unsqueeze(1), f'{masks_path}mask_{idx+1}.png')
+            torchvision.utils.save_image(x, f'{orig_path}orig_{idx+1}.png')
+            if idx == num-1:
+                break
+    model.train()
