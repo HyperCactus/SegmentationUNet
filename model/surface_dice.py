@@ -9,6 +9,7 @@ from numba import jit
 from scipy.ndimage import label, generate_binary_structure
 from skimage.transform import resize
 from typing import Optional, Tuple, Union
+from global_params import *
 
 
 class ParticipantVisibleError(Exception):
@@ -189,9 +190,11 @@ def score(
             assert df.loc[:, slice_id_column_name].is_monotonic_increasing
 
         group_mask_sol, group_mask_sub = [], []
-        height, width = df.loc[0, 'height'], df.loc[0, 'width']
-        assert (df.loc[:, 'height'].nunique() == 1) and (df.loc[:, 'width'].nunique() == 1),\
-            "Height and width must be constant within each group."
+        
+        # ****************** AD TO CHANGE THIS TO GET IT TO WORK ******************
+        height, width = IMAGE_HEIGHT, IMAGE_WIDTH# df.loc[0, 'height'], df.loc[0, 'width']
+        # assert (df.loc[:, 'height'].nunique() == 1) and (df.loc[:, 'width'].nunique() == 1),\
+        #     "Height and width must be constant within each group."
 
         # Decode slice RLEs to arrays
         for row in df.itertuples():

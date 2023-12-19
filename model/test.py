@@ -22,3 +22,4 @@ from global_params import *
 
 kidney_5_path = 'data_downsampled512/test/kidney_5'
 kidney_6_path = 'data_downsampled512/test/kidney_6'
+

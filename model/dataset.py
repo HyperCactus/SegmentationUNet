@@ -145,6 +145,12 @@ def val_transform(image, mask):
 
     return augmented_image, augmented_mask
 
+def create_loader(image_files, mask_files, batch_size, 
+                  augmentations=None, shuffle=False):
+    
+    dataset = CustomDataset(image_files, mask_files, augmentation_transforms=augmentations)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+    
 
 #-------------------------- Test the dataset --------------------------#
 image_files = []

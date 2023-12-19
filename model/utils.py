@@ -9,6 +9,8 @@ import cv2
 from PIL import Image
 import torch
 import matplotlib.pyplot as plt
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
 import torchvision
 import random
 import os
@@ -18,6 +20,7 @@ import torch
 import torch.nn as nn
 from costom_loss import IoULoss
 from global_params import *
+from dataset import create_loader, val_transform
 
 # The below class is from https://github.com/hubutui/DiceLoss-PyTorch and was modified
 # It is a loss function based on the Dice score.
@@ -411,13 +414,13 @@ def create_rle_df(kidney_dirs: [str],
         kidney_dirs = [kidney_dirs]
     
     df = pd.DataFrame(columns=['id', 'rle'])
-    df.set_index('id', inplace=True)
+    # df.set_index('id', inplace=True)
         
     for kidney_dir in kidney_dirs:
         assert os.path.exists(kidney_dir), f'{kidney_dir} does not exist'
         
         kidney_name = os.path.basename(kidney_dir)
-        masks = sorted([os.path.join(kidney_dir, f) for f in 
+        masks = sorted([os.path.join(kidney_dir, subdir_name, f) for f in 
                         os.listdir(os.path.join(kidney_dir, subdir_name)) if f.endswith('.tif')])
         
         for mask_file in masks:
@@ -425,41 +428,74 @@ def create_rle_df(kidney_dirs: [str],
             mask = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
             # ToDo: rezise the mask in a smart way
             
-            df[f'{kidney_name}_{mask_name[:-4]}'] = rle_encode(rle_decode(mask, img_shape=img_size))
+            id = f'{kidney_name}_{mask_name[:-4]}'
+            rle = rle_encode(mask)
+            # df.loc[id] = rle
+            df.loc[len(df)] = [id, rle]
+        
+        df['width'] = [img_size[0]] * len(df)
+        df['height'] = [img_size[1]] * len(df)
     
     return df
 
-def save_predictions(kidney_dirs, model, num='all', 
+def save_predictions(kidney_dirs, model, num='all', min_idx=0,
                      folder='saved_images/', device='cuda', 
-                     verbose=True):
+                     verbose=True, image_size=(IMAGE_HEIGHT, IMAGE_WIDTH)):
     """
     Saves the predictions from the model as images in the folder
     """
     if type(kidney_dirs) == str:
         kidney_dirs = [kidney_dirs]
-    
-    preds_path = f'{folder}preds/'
-    masks_path = f'{folder}labels/'
-    orig_path = f'{folder}images/'
-    os.makedirs(preds_path, exist_ok=True)
-    os.makedirs(masks_path, exist_ok=True)
-    os.makedirs(orig_path, exist_ok=True)
-    
-    loader
-    
-    model.eval()
-    print('>>> Generating and saving predictions') if verbose else None
-    loop = tqdm(enumerate(loader), total=num, leave=False) if verbose else enumerate(loader)
-    with torch.no_grad():
-        # for idx, (x, y) in enumerate(loader):
-        for idx, (x, y) in loop:
-            x = x.to(device)
-            y = y.to(device) # add 1 channel to mask
-            preds = torch.sigmoid(model(x))
-            preds = (preds > PREDICTION_THRESHOLD).float()
-            torchvision.utils.save_image(preds, f'{preds_path}pred_{idx+1}.png')
-            torchvision.utils.save_image(y.unsqueeze(1), f'{masks_path}mask_{idx+1}.png')
-            torchvision.utils.save_image(x, f'{orig_path}orig_{idx+1}.png')
-            if idx == num-1:
-                break
-    model.train()
+
+    for kidney_dir in kidney_dirs:
+        assert os.path.exists(kidney_dir), f'{kidney_dir} does not exist'
+        
+        kidney_name = os.path.basename(kidney_dir)
+        
+        preds_path = os.path.join(folder, kidney_name, 'preds')
+        masks_path = os.path.join(folder, kidney_name, 'labels')
+        images_path = os.path.join(folder, kidney_name, 'images')
+        os.makedirs(preds_path, exist_ok=True)
+        os.makedirs(masks_path, exist_ok=True)
+        os.makedirs(images_path, exist_ok=True)
+        
+        masks = sorted([os.path.join(kidney_dir, 'labels', f) for f in 
+                        os.listdir(os.path.join(kidney_dir, 'labels')) if f.endswith('.tif')])
+        images = sorted([os.path.join(kidney_dir, 'images', f) for f in 
+                        os.listdir(os.path.join(kidney_dir, 'images')) if f.endswith('.tif')])
+                
+        if num == 'all':
+            num = len(masks)
+        else:
+            num = min(num, len(masks))
+        
+        assert min_idx + num <= len(masks), f'Index out of range. There are {len(masks)} masks.'
+        
+        # transforms = A.Compose([
+        #     A.Resize(image_size[0], image_size[1], interpolation=cv2.INTER_NEAREST),
+        #     A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+        #     ToTensorV2()
+        # ])
+        loader = create_loader(images, masks, batch_size=1, augmentations=val_transform)
+        model.eval()
+        print('>>> Generating and saving predictions') if verbose else None
+        loop = tqdm(enumerate(loader), total=num, leave=False) if verbose else enumerate(loader)
+        with torch.no_grad():
+            for idx, (x, y) in loop:
+                if idx < min_idx:
+                    continue
+                
+                filename = os.path.basename(masks[idx])
+                x = x.to(device)
+                y = y.to(device) # add 1 channel to mask
+                preds = torch.sigmoid(model(x))
+                preds = (preds > PREDICTION_THRESHOLD).float()
+                torchvision.utils.save_image(preds, os.path.join(preds_path, filename))
+                torchvision.utils.save_image(y.unsqueeze(1), os.path.join(masks_path, filename))
+                torchvision.utils.save_image(x, os.path.join(images_path, filename))
+                if idx > min_idx + num:
+                    break
+        model.train()
+        
+
+

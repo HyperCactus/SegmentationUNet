@@ -17,17 +17,7 @@ IMAGE_WIDTH = 512
 HIGH_PASS_ALPHA = 0.1
 HIGH_PASS_STRENGTH = 0.1
 
-# Downsampled data set paths
 CHECKPOINT_DIR = 'checkpoints/checkpoint.pth.tar'
-
-TRAIN_IMG_DIR = 'data/ISIC_2017_downsampled/train/images'
-TRAIN_MASK_DIR = 'data/ISIC_2017_downsampled/train/masks'
-
-TEST_IMG_DIR = 'data/ISIC_2017_downsampled/test/images'
-TEST_MASK_DIR = 'data/ISIC_2017_downsampled/test/masks'
-
-VAL_IMG_DIR = 'data/ISIC_2017_downsampled/val/images'
-VAL_MASK_DIR = 'data/ISIC_2017_downsampled/val/masks'
 
 # base_path = 'data/train'
 base_path = 'data_downsampled512/train'
