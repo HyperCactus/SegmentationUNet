@@ -9,9 +9,11 @@ import cv2
 from PIL import Image
 import torch
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import ImageGrid
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import torchvision
+from torchvision.transforms import PILToTensor
 import random
 import os
 import time
@@ -497,5 +499,73 @@ def save_predictions(kidney_dirs, model, num='all', min_idx=0,
                     break
         model.train()
         
+def view_examples(kidney_dirs, pred_folder='preds', num=4, 
+                  save_location='save_data/examples', 
+                  save=False, shuffle=True):
+    """
+    kidney_dirs is either a string or list of strings that are the paths to the kidney directories
+    each kidney directory should contain the folders images, labels and preds. 
+    Creates a grid of images with the original image, the mask and the prediction.
+    """
+    if type(kidney_dirs) == str:
+        kidney_dirs = [kidney_dirs]
+
+    for kidney_dir in kidney_dirs:
+        assert os.path.exists(kidney_dir), f'{kidney_dir} does not exist'
+        
+        kidney_name = os.path.basename(kidney_dir)
+        
+        preds_path = os.path.join(kidney_dir, pred_folder)
+        masks_path = os.path.join(kidney_dir, 'labels')
+        images_path = os.path.join(kidney_dir, 'images')
+
+        mask_files = sorted([os.path.join(masks_path, f) for f in 
+                        os.listdir(masks_path) if f.endswith('.tif')])
+        image_files = sorted([os.path.join(images_path, f) for f in 
+                        os.listdir(images_path) if f.endswith('.tif')])
+        pred_files = sorted([os.path.join(preds_path, f) for f in 
+                        os.listdir(preds_path) if f.endswith('.tif')])
+        
+        if shuffle:
+            indices = random.sample(range(len(mask_files)), num)
+        else:
+            indices = range(num)
+        
+        images = []
+        masks = []
+        preds = []
+
+        transform = PILToTensor()
+        for i in indices:
+            images.append(transform(Image.open(image_files[i])))
+            masks.append(transform(Image.open(mask_files[i])))
+            preds.append(transform(Image.open(pred_files[i])))
+
+        fig_width = 20
+        fir, axs = plt.subplots(1, 3, figsize=(fig_width, fig_width*num/3))
+        
+        imgs_ax, masks_ax, preds_ax = axs[0], axs[1], axs[2]
+        images_col = torchvision.utils.make_grid(images, nrow=1)
+        masks_col = torchvision.utils.make_grid(masks, nrow=1)
+        preds_col = torchvision.utils.make_grid(preds, nrow=1)
+
+        imgs_ax.imshow(images_col.permute(1, 2, 0))
+        imgs_ax.axis('off')
+        imgs_ax.set_title('Original Image')
+
+        masks_ax.imshow(masks_col.permute(1, 2, 0))
+        masks_ax.axis('off')
+        masks_ax.set_title('Mask')
+
+        preds_ax.imshow(preds_col.permute(1, 2, 0))
+        preds_ax.axis('off')
+        preds_ax.set_title('Prediction')
+
+        fir.suptitle(f'Examples from {kidney_name}')
+
+        if save:
+            plt.savefig(f'{save_location}/{kidney_name}_examples.png')
+        
+        plt.show()
 
 

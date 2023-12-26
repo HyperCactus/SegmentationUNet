@@ -19,7 +19,7 @@ HIGH_PASS_STRENGTH = 0.1
 
 CHECKPOINT_DIR = 'checkpoints/checkpoint.pth.tar'
 
-# base_path = 'data/train'
-base_path = 'data_downsampled512/train'
+base_path = 'data/train'
+# base_path = 'data_downsampled512/train'
 # dataset = 'kidney_1_dense'
 datasets = ['kidney_1_dense', 'kidney_1_voi', 'kidney_2', 'kidney_3_sparse']

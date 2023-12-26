@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from IPython.display import display
 from surface_dice import score
 import albumentations as A
+import glob
 from albumentations.pytorch import ToTensorV2
 from global_params import *
 
@@ -22,16 +23,20 @@ def main():
     model = ImprovedUNet(in_channels=3, out_channels=1).to(device=device)
     load_checkpoint(torch.load(CHECKPOINT_DIR), model)
     
-    save_predictions('data_downsampled512/train/kidney_1_voi', model, device=device, num=30)
-    
+    # save_predictions('data_downsampled512/train/kidney_1_voi', model, device=device, num=30)
+    save_predictions('data/train/kidney_1_voi', model, device=device, num=30)
+
+
     ground_truth_rles = create_rle_df('saved_images/kidney_1_voi', subdir_name='labels')
     prediction_rles = create_rle_df('saved_images/kidney_1_voi', subdir_name='preds')
     
-    display(ground_truth_rles)
-    print(ground_truth_rles.loc[0, 'height'])
+    # display(ground_truth_rles)
+    # print(ground_truth_rles.loc[0, 'height'])
     
     surface_dice_score = score(ground_truth_rles, prediction_rles, 'id', 'rle')
     print(f'Surface Dice Score: {surface_dice_score:.4f}')
+
+    view_examples('saved_images/kidney_1_voi')
     
     # # calculate the dice score on the test set
     # dice_score = calc_dice_score(model, VAL_LOADER, device=device, verbose=True)

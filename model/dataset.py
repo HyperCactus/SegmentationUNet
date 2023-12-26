@@ -72,10 +72,33 @@ class CustomDataset(Dataset):
 
         return image, mask
 
+class UsageDataset(Dataset):
+    def __init__(self, image_files, 
+                 input_size=(IMAGE_WIDTH, IMAGE_HEIGHT), 
+                 augmentation_transforms=None):
+        self.image_files = image_files
+        self.input_size = input_size
+        self.augmentation_transforms = augmentation_transforms
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+       
+        image_path = self.image_files[idx]
+
+        image = preprocess_image(image_path)
+
+        if self.augmentation_transforms:
+            image = self.augmentation_transforms(image)
+
+        return image
+
 
 def preprocess_image(path):
     
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     # print(f'fresh process image img.shape: {img.shape}')
     img = np.tile(img[...,None],[1, 1, 3]) 
     img = img.astype('float32') 
@@ -171,18 +194,18 @@ for dataset in datasets:
 train_image_files, val_image_files, train_mask_files, val_mask_files = train_test_split(
     image_files, label_files, test_size=0.1, random_state=42)
 
-testing_path = 'data_downsampled512/train/test_output'
-testing_img_files = sorted([os.path.join(testing_path, 'images', f) for f in os.listdir(testing_path+'/images') if f.endswith('.tif')])
-testing_mask_files = sorted([os.path.join(testing_path, 'labels', f) for f in os.listdir(testing_path+'/labels') if f.endswith('.tif')])
+# testing_path = 'data_downsampled512/train/test_output'
+# testing_img_files = sorted([os.path.join(testing_path, 'images', f) for f in os.listdir(testing_path+'/images') if f.endswith('.tif')])
+# testing_mask_files = sorted([os.path.join(testing_path, 'labels', f) for f in os.listdir(testing_path+'/labels') if f.endswith('.tif')])
 # testing_mask_files = train_mask_files[:len(testing_img_files)]
 
 train_dataset = CustomDataset(train_image_files, train_mask_files, augmentation_transforms=augment_image)
 val_dataset = CustomDataset(val_image_files, val_mask_files, augmentation_transforms=val_transform)
-test_of_dataset = CustomDataset(testing_img_files, testing_mask_files, augmentation_transforms=val_transform)
+# test_of_dataset = CustomDataset(testing_img_files, testing_mask_files, augmentation_transforms=val_transform)
 
 TRAIN_LOADER = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 VAL_LOADER = DataLoader(val_dataset, batch_size=1, shuffle=False)
-testing_loader = DataLoader(test_of_dataset, batch_size=1, shuffle=True)
+# testing_loader = DataLoader(test_of_dataset, batch_size=1, shuffle=True)
 
 # for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
 #     print("Batch", batch_idx + 1)
@@ -190,33 +213,33 @@ testing_loader = DataLoader(test_of_dataset, batch_size=1, shuffle=True)
 #     print("Mask batch shape:", batch_masks.shape)
 
 
-# for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
-#     print("Batch", batch_idx + 1)
-#     print("Image batch shape:", batch_images.shape)
-#     print("Mask batch shape:", batch_masks.shape)
+for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
+    print("Batch", batch_idx + 1)
+    print("Image batch shape:", batch_images.shape)
+    print("Mask batch shape:", batch_masks.shape)
     
-#     for image, mask, image_path, mask_path in zip(batch_images, batch_masks, train_image_files, train_mask_files):
+    for image, mask, image_path, mask_path in zip(batch_images, batch_masks, train_image_files, train_mask_files):
        
-#         image = image.permute((1, 2, 0)).numpy()*255.0
-#         image = image.astype('uint8')
-#         mask = (mask*255).numpy().astype('uint8')
+        image = image.permute((1, 2, 0)).numpy()*255.0
+        image = image.astype('uint8')
+        mask = (mask*255).numpy().astype('uint8')
         
-#         image_filename = os.path.basename(image_path)
-#         mask_filename = os.path.basename(mask_path)
+        image_filename = os.path.basename(image_path)
+        mask_filename = os.path.basename(mask_path)
         
-#         plt.figure(figsize=(15, 10))
+        plt.figure(figsize=(15, 10))
         
-#         plt.subplot(2, 4, 1)
-#         plt.imshow(image, cmap='gray')
-#         plt.title(f"Original Image - {image_filename}")
+        plt.subplot(2, 4, 1)
+        plt.imshow(image, cmap='gray')
+        plt.title(f"Original Image - {image_filename}")
         
-#         plt.subplot(2, 4, 2)
-#         plt.imshow(mask, cmap='gray')
-#         plt.title(f"Mask Image - {mask_filename}")
+        plt.subplot(2, 4, 2)
+        plt.imshow(mask, cmap='gray')
+        plt.title(f"Mask Image - {mask_filename}")
         
-#         plt.tight_layout()
-#         plt.show()
-#     break
+        plt.tight_layout()
+        plt.show()
+    break
 
 # for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
 #     print("Batch", batch_idx + 1)

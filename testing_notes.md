@@ -55,3 +55,5 @@ validation dice score = 0.6541
 * Now running successfully on Rangpur!, ToDo: hpyerparamiter search, 3D upgrade, TTA, surface dice evaluation, better loss function
 * Trained on Rangpur for 30 epochs with downsampled dataset
 validation dice score = 0.7964
+surface dice score = 0.9564
+* Check if overfitting!
