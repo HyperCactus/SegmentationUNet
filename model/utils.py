@@ -408,7 +408,9 @@ def rle_encode(mask, bg = 0) -> dict:
 
 def create_rle_df(kidney_dirs: [str], 
                   subdir_name: str = 'preds',
-                  img_size=(512, 512)):
+                  img_size=(512, 512), 
+                  resize=True,
+                  orig_path='/kaggle/input/blood-vessel-segmentation/test/'):
     """
     Creates a dataframe with the image ids and the predicted masks
     """
@@ -420,19 +422,36 @@ def create_rle_df(kidney_dirs: [str],
         
     for kidney_dir in kidney_dirs:
         assert os.path.exists(kidney_dir), f'{kidney_dir} does not exist'
-        
+
+        if resize:
+            orig_size = cv2.imread(os.path.join(orig_path, os.path.basename(kidney_dir), 
+                                                'images', '0001.tif')).shape[:2]
+            img_size = (orig_size[1], orig_size[0])
+
         kidney_name = os.path.basename(kidney_dir)
         masks = sorted([os.path.join(kidney_dir, subdir_name, f) for f in 
                         os.listdir(os.path.join(kidney_dir, subdir_name)) if f.endswith('.tif')])
         
         for mask_file in masks:
             mask_name = os.path.basename(mask_file)
-            mask = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
-            # ToDo: rezise the mask in a smart way
+            # mask = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE)
+            mask = Image.open(mask_file).convert('L').resize(img_size, resample=Image.BOX)
+
+            # display a mask to check if it is correct
+            plt.imshow(mask)
+
+            mask = np.array(mask, dtype=np.float32)
+
+            print(f'MASK SHAPE: {mask.shape}, MASK MAX: {mask.max()}')
+
+            
+
+            # # ToDo: rezise the mask in a smart way
+            # # the mask may need to be upscaled or downscaled
+            # mask = mask.resize(img_size, )
             
             id = f'{kidney_name}_{mask_name[:-4]}'
             rle = rle_encode(mask)
-            # df.loc[id] = rle
             df.loc[len(df)] = [id, rle]
         
         df['width'] = [img_size[0]] * len(df)
@@ -440,9 +459,27 @@ def create_rle_df(kidney_dirs: [str],
     
     return df
 
+def _predict_transform(image, mask):
+    
+    image_np = image.permute(1, 2, 0).numpy()
+    mask_np = mask.numpy()
+
+    transform = A.Compose([
+        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+    ])
+
+    augmented = transform(image=image_np, mask=mask_np)
+    augmented_image, augmented_mask = augmented['image'], augmented['mask']
+
+    augmented_image = torch.tensor(augmented_image, dtype=torch.float32).permute(2, 0, 1)
+    augmented_mask = torch.tensor(augmented_mask, dtype=torch.float32)
+
+    return augmented_image, augmented_mask
+
 def save_predictions(kidney_dirs, model, num='all', min_idx=0,
                      folder='saved_images/', device='cuda', 
-                     verbose=True, image_size=(IMAGE_HEIGHT, IMAGE_WIDTH)):
+                     verbose=True, image_size=(IMAGE_HEIGHT, IMAGE_WIDTH),
+                     keep_size=False):
     """
     Saves the predictions from the model as images in the folder
     """
@@ -473,12 +510,15 @@ def save_predictions(kidney_dirs, model, num='all', min_idx=0,
         
         assert min_idx + num <= len(masks), f'Index out of range. There are {len(masks)} masks.'
         
-        # transforms = A.Compose([
-        #     A.Resize(image_size[0], image_size[1], interpolation=cv2.INTER_NEAREST),
-        #     A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
-        #     ToTensorV2()
-        # ])
-        loader = create_loader(images, masks, batch_size=1, augmentations=val_transform)
+        post_transforms = A.Compose([
+            A.Resize(image_size[0], image_size[1], interpolation=cv2.INTER_CUBIC),
+        ])
+        
+        if keep_size:
+            loader = create_loader(images, masks, batch_size=1, augmentations=_predict_transform)
+        else:
+            loader = create_loader(images, masks, batch_size=1, augmentations=val_transform)
+        
         model.eval()
         print('>>> Generating and saving predictions') if verbose else None
         loop = tqdm(enumerate(loader), total=num, leave=False) if verbose else enumerate(loader)
@@ -492,6 +532,12 @@ def save_predictions(kidney_dirs, model, num='all', min_idx=0,
                 y = y.to(device) # add 1 channel to mask
                 preds = torch.sigmoid(model(x))
                 preds = (preds > PREDICTION_THRESHOLD).float()
+
+                # resize the predictions
+                # preds = preds.to('cpu').numpy()
+                # preds = post_transforms(image=preds)['image']
+                # preds = torch.tensor(preds, dtype=torch.float32).unsqueeze(0)
+
                 torchvision.utils.save_image(preds, os.path.join(preds_path, filename))
                 torchvision.utils.save_image(y.unsqueeze(1), os.path.join(masks_path, filename))
                 torchvision.utils.save_image(x, os.path.join(images_path, filename))

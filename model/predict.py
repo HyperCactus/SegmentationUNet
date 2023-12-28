@@ -52,6 +52,8 @@ def main():
         img_dir = os.path.join(kidney_dir, 'images')
         img_files = sorted([os.path.join(img_dir, f) 
                             for f in os.listdir(img_dir) if f.endswith('.tif')])
+        
+        origninal_size = cv2.imread(img_files[0]).shape[:2]
 
         test_set = UsageDataset(img_files, transform=test_transform)
 
@@ -78,13 +80,13 @@ def main():
             preds = (preds > PREDICTION_THRESHOLD).float()
             # save_predictions_as_imgs(image, preds, folder='test_predictions/kidney_6', device=device)
     
-    # kidney_paths = glob(os.path.join(tesd_dir, 'kidney_*'))
+    kidney_paths = glob(os.path.join(tesd_dir, 'kidney_*'))
 
-    # save_predictions(kidney_paths, model, device=device)
+    save_predictions(kidney_paths, model, device=device, resize=origninal_size)
     
-    # prediction_rles = create_rle_df(kidney_paths, subdir_name='preds')
+    prediction_rles = create_rle_df(kidney_paths, subdir_name='preds')
     
-    # prediction_rles.to_csv('submission.csv', index=False)
+    prediction_rles.to_csv('submission.csv', index=False)
 
 
 if __name__ == '__main__':

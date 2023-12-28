@@ -57,3 +57,6 @@ validation dice score = 0.6541
 validation dice score = 0.7964
 surface dice score = 0.9564
 * Check if overfitting!
+* implement smart tiling! check out https://www.kaggle.com/code/squidinator/sennet-hoa-in-memory-tiled-dataset-pytorch
+* need to resize masks to original size for submission, tiling is the ultimate goal
+* check [this](https://stackoverflow.com/questions/58216000/get-total-amount-of-free-gpu-memory-and-available-using-pytorch) out for gpu memory usage info for rangpur optimization.

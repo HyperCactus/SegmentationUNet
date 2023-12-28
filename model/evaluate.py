@@ -35,7 +35,7 @@ def main():
     
     surface_dice_score = score(ground_truth_rles, prediction_rles, 'id', 'rle')
     print(f'Surface Dice Score: {surface_dice_score:.4f}')
-
+    
     view_examples('saved_images/kidney_1_voi')
     
     # # calculate the dice score on the test set
