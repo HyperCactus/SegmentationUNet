@@ -164,29 +164,37 @@ class UsageDataset(Dataset):
        
         image_path = self.image_files[idx]
 
-        image = preprocess_image(image_path)
+        image, orig_size = preprocess_image(image_path, return_size=True)
+        # orig_size = image.shape
 
         if self.augmentation_transforms:
             image = self.augmentation_transforms(image)
 
-        return image
+        return image, torch.tensor(np.array([orig_size[0], orig_size[1]]))
 
 
-def preprocess_image(path):
+def preprocess_image(path, return_size=False):
     
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     # print(f'fresh process image img.shape: {img.shape}')
     img = np.tile(img[...,None],[1, 1, 3]) 
     img = img.astype('float32') 
+
+    # scaling to 0-1
     mx = np.max(img)
     if mx:
         img/=mx
     
+    orig_size = img.shape
+    
     # print(f'process image img.shape: {img.shape}')
     img = np.transpose(img, (2, 0, 1))
     img_ten = torch.tensor(img)
-    return img_ten
+    if return_size:
+        return img_ten, orig_size
+    else:
+        return img_ten
 
 def preprocess_mask(path):
     
@@ -249,6 +257,12 @@ def create_loader(image_files, mask_files, batch_size,
                   augmentations=None, shuffle=False):
     
     dataset = CustomDataset(image_files, mask_files, augmentation_transforms=augmentations)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+def create_test_loader(image_files, batch_size, 
+                  augmentations=None, shuffle=False):
+    
+    dataset = UsageDataset(image_files, augmentation_transforms=augmentations)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
     
 
