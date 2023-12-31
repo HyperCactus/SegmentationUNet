@@ -60,3 +60,7 @@ surface dice score = 0.9564
 * implement smart tiling! check out https://www.kaggle.com/code/squidinator/sennet-hoa-in-memory-tiled-dataset-pytorch
 * need to resize masks to original size for submission, tiling is the ultimate goal
 * check [this](https://stackoverflow.com/questions/58216000/get-total-amount-of-free-gpu-memory-and-available-using-pytorch) out for gpu memory usage info for rangpur optimization.
+* submission to kaggle, images downsampled to 512x512 and then upscaled using cv2.INTER_CUBIC interpolation, using remove small objects 5.
+public score: 0.208
+* turned off remove small objects.
+public score: 0.209

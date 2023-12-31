@@ -192,9 +192,10 @@ def score(
         group_mask_sol, group_mask_sub = [], []
         
         # ****************** AD TO CHANGE THIS TO GET IT TO WORK ******************
-        height, width = IMAGE_HEIGHT, IMAGE_WIDTH# df.loc[0, 'height'], df.loc[0, 'width']
-        # assert (df.loc[:, 'height'].nunique() == 1) and (df.loc[:, 'width'].nunique() == 1),\
-        #     "Height and width must be constant within each group."
+        # height, width = IMAGE_HEIGHT, IMAGE_WIDTH# df.loc[0, 'height'], df.loc[0, 'width']
+        assert (df.loc[:, 'height'].nunique() == 1) and (df.loc[:, 'width'].nunique() == 1),\
+            "Height and width must be constant within each group."
+        height, width = df.loc[0, 'height'], df.loc[0, 'width']
 
         # Decode slice RLEs to arrays
         for row in df.itertuples():

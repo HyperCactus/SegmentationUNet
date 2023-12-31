@@ -424,6 +424,8 @@ def create_rle_df(kidney_dirs: [str],
         assert os.path.exists(kidney_dir), f'{kidney_dir} does not exist'
 
         if resize:
+            example_path = os.path.join(orig_path, kidney_name, 'images', '0000.tif')
+            assert os.path.exists(example_path), f'{example_path} does not exist'
             orig_size = cv2.imread(os.path.join(orig_path, os.path.basename(kidney_dir), 
                                                 'images', '0001.tif')).shape[:2]
             img_size = (orig_size[1], orig_size[0])
