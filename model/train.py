@@ -8,12 +8,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from modules import ImprovedUNet
-from dataset import TRAIN_LOADER, VAL_LOADER
+from dataset import VAL_LOADER, TRAIN_TRANSFORMS, create_loader # TRAIN_LOADER,
 import time
 from utils import *
 from torch.utils.tensorboard import SummaryWriter
 from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss
 from global_params import * # Hyperparameters and other global variables
+from evaluate import surface_dice
 
 # RANGPUR Settings 
 from evaluate import main as evaluate_fn
@@ -77,7 +78,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
 
 def train():    
     # 3 channels in for RGB images, 1 channel out for binary mask
-    model = ImprovedUNet(in_channels=3, out_channels=1).to(device)
+    model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device)
     
     # loss_fn = torch.nn.BCEWithLogitsLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
@@ -106,7 +107,13 @@ def train():
     for epoch in range(NUM_EPOCHS):
         train_epoch_losses = [] # train losses for the epoch
         # Train the model for one epoch
-        train_epoch(TRAIN_LOADER, model, optimizer, loss_fn, scaler, train_epoch_losses)
+
+        for kidney in TRAIN_DATASETS:
+            train_loader = create_loader(os.path.join(kidney, 'images'), 
+                                         os.path.join(kidney, 'labels'), 
+                                         BATCH_SIZE, 
+                                         transform=TRAIN_TRANSFORMS)
+            train_epoch(train_loader, model, optimizer, loss_fn, scaler, train_epoch_losses)
         
         # Calculate the average loss for the epoch
         average_loss = np.mean(train_epoch_losses)
@@ -117,7 +124,8 @@ def train():
         scheduler.step(epoch_losses[-1])
         
         # Calculate the validation dice score after each epoch
-        val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)
+        # val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)
+        val_dice_score = surface_dice(model, device=device, loader=VAL_LOADER, data_dir=VAL_DATASET_DIR)
         val_dice_score = np.round(val_dice_score.item(), 4)
         dice_scores.append(val_dice_score)
         print(f'Validation dice score: {val_dice_score}')
@@ -147,7 +155,7 @@ def train():
     }
     save_checkpoint(checkpoint)
     
-    evaluate_fn()
+    # evaluate_fn()
         
     # Plot the losses
     plt.figure(figsize=(20, 10))
@@ -171,10 +179,10 @@ def train():
     
     # plot dice score vs epoch
     plt.figure(figsize=(20, 10))
-    plt.plot(dice_scores, label='Dice Score')
+    plt.plot(dice_scores, label='Surface Dice Score')
     plt.xlabel('Epoch #')
-    plt.ylabel('Dice Score')
-    plt.title('Validation Dice Scores')
+    plt.ylabel('Surface Dice Score')
+    plt.title('Validation Surface Dice Scores')
     plt.grid(True)
     plt.savefig('save_data/dice_scores.png')
     # plt.show()

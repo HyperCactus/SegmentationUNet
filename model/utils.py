@@ -22,7 +22,9 @@ import torch
 import torch.nn as nn
 from costom_loss import IoULoss
 from global_params import *
-from dataset import create_loader, val_transform
+from dataset import create_loader#, val_transform
+
+val_transform = None
 
 # The below class is from https://github.com/hubutui/DiceLoss-PyTorch and was modified
 # It is a loss function based on the Dice score.

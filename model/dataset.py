@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import matplotlib.pyplot as plt
+from glob import glob
 from global_params import *
 
 
@@ -26,10 +27,8 @@ class SegmenTrainDataset(Dataset):
         self.tensorize = ToTensorV2()
         # self.images = [img for img in os.listdir(self.image_dir) if img.endswith(file_ext)]
 
-        self.image_files = sorted([os.path.join(self.image_dir, f) 
-                                   for f in os.listdir(self.image_dir) if f.endswith(img_file_ext)])
-        self.mask_files = sorted([os.path.join(self.mask_dir, f)
-                                  for f in os.listdir(self.mask_dir) if f.endswith(mask_file_ext)])
+        self.image_files = glob(os.path.join(self.image_dir, f'*{img_file_ext}'))
+        self.mask_files = glob(os.path.join(self.mask_dir, f'*{mask_file_ext}'))
         
         assert len(self.image_files) == len(self.mask_files), \
             f'Number of images and masks do not match. Found {len(self.image_files)} images and {len(self.mask_files)} masks.'
@@ -41,9 +40,9 @@ class SegmenTrainDataset(Dataset):
     
     def __getitem__(self, index):
         # images and masks are 1 channel greyscale
-        image = np.array(Image.open(self.image_files[index]).convert('L'))
+        image = cv2.imread(self.image_files[index], cv2.IMREAD_GRAYSCALE)
         image = image / 255.0 # normalize images to be between 0 and 1
-        mask = np.array(Image.open(self.mask_files[index]).convert('L'), dtype=np.float32)
+        mask = cv2.imread(self.mask_files[index], cv2.IMREAD_GRAYSCALE)
         mask[mask == 255.0] = 1.0 # convert all 255 values to 1.0 to make it a binary mask
         
         if self.transform is not None:    # IMPLEMENT TRANSFORMS HERE
@@ -55,6 +54,10 @@ class SegmenTrainDataset(Dataset):
             image = self.tensorize(image=image)['image']
         if not isinstance(mask, torch.Tensor):
             mask = self.tensorize(image=mask)['image']
+        
+        # the datatype of the images and masks are float32
+        image = image.type(torch.float32)
+        mask = mask.type(torch.float32)
         
         return image, mask
 
@@ -69,38 +72,62 @@ VAL_TRANSFORMS = A.Compose([
     ToTensorV2()
 ])
 
-VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, 1, transform=VAL_TRANSFORMS)
+TRAIN_TRANSFORMS = A.Compose([
+    A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, always_apply=True),
+    A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
+    A.HorizontalFlip(p=0.5),
+    A.VerticalFlip(p=0.5),
+    A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=15, shift_limit=0.1, p=0.8, border_mode=0),
+    A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
+    A.OneOf(
+        [
+            A.Blur(blur_limit=3, p=1),
+            A.MotionBlur(blur_limit=3, p=1),
+        ],
+        p=0.7,
+    ),
+    A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+])
 
-# testing the dataset:
-for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
-    if batch_idx < 200:
-        continue
-    print("Batch", batch_idx + 1)
-    print("Image batch shape:", batch_images.shape)
-    print("Mask batch shape:", batch_masks.shape)
+VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=VAL_TRANSFORMS)
+
+# # testing the dataset:
+# for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
+#     # print(f'BATCH {batch_idx+1}')
+#     if batch_idx < 200/BATCH_SIZE:
+#         continue
+#     if batch_idx > (200+BATCH_SIZE)/BATCH_SIZE:
+#         break
+#     print("Batch", batch_idx + 1)
+#     print("Image batch shape:", batch_images.shape)
+#     print("Mask batch shape:", batch_masks.shape)
     
-    for image, mask in zip(batch_images, batch_masks):
+#     for image, mask in zip(batch_images, batch_masks):
        
-        image = image.permute((1, 2, 0)).numpy()*255.0
-        image = image.astype('uint8')
-        mask = (mask*255).numpy().astype('uint8')
+#         # image = image.permute((1, 2, 0)).numpy()*255.0;
+#         print(f'image.shape presqueese: {image.shape}')
+#         image = image.squeeze().numpy()*255.0
+#         # image = image.numpy()*255.0
+#         print(f'image.shape postsqueese: {image.shape}')
+#         image = image.astype('uint8')
+#         mask = (mask*255).numpy().astype('uint8')
         
-        # image_filename = os.path.basename(image_path)
-        # mask_filename = os.path.basename(mask_path)
+#         # image_filename = os.path.basename(image_path)
+#         # mask_filename = os.path.basename(mask_path)
         
-        plt.figure(figsize=(15, 10))
+#         plt.figure(figsize=(10, 5))
         
-        plt.subplot(2, 4, 1)
-        plt.imshow(image, cmap='gray')
-        # plt.title(f"Original Image - {image_filename}")
+#         plt.subplot(1, 2, 1)
+#         plt.imshow(image, cmap='gray')
+#         # plt.title(f"Original Image - {image_filename}")
         
-        plt.subplot(2, 4, 2)
-        plt.imshow(mask, cmap='gray')
-        # plt.title(f"Mask Image - {mask_filename}")
+#         plt.subplot(1, 2, 2)
+#         plt.imshow(mask, cmap='gray')
+#         # plt.title(f"Mask Image - {mask_filename}")
         
-        plt.tight_layout()
-        plt.show()
-    break
+#         plt.tight_layout()
+#         plt.show()
+#     break
 
 
 # # ========================================================================================================
