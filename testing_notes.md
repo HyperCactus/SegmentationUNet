@@ -64,3 +64,5 @@ surface dice score = 0.9564
 public score: 0.208
 * turned off remove small objects.
 public score: 0.209
+* Local inference using kidney 2 as validation set with same process as kaggle submission, prediction threshold 0.9.
+Surface Dice Score: 0.6954
