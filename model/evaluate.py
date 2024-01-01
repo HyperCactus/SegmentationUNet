@@ -8,7 +8,7 @@ import torch
 from utils import *
 from modules import ImprovedUNet
 from torch.utils.data import DataLoader
-from IPython.display import display
+# from IPython.display import display
 from surface_dice import score
 import albumentations as A
 from glob import glob
