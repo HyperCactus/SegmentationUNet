@@ -28,7 +28,7 @@ def preprocess_mask(path):
     
     return msk_ten
 
-def surface_dice(model, device=device, loader=VAL_LOADER, data_dir='data/train/kidney_2', sub_data_idxs=None):
+def surface_dice(model, device=device, loader=VAL_LOADER, data_dir=f'{BASE_PATH}/kidney_2', sub_data_idxs=None):
 
     surface_dice_scores = []
     pbar = tqdm(enumerate(loader), total=len(loader), desc='Inference ')
@@ -84,7 +84,7 @@ def main():
     # # print(ground_truth_rles.loc[0, 'height'])
     
     # surface_dice_score = score(ground_truth_rles, prediction_rles, 'id', 'rle')
-    
+
     surface_dice_score = surface_dice(model, sub_data_idxs=(400, 500))
     # surface_dice_score = surface_dice(model)
 
