@@ -62,7 +62,6 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
             # print(f'Data shape: {data.shape}\n Targets shape: {targets.shape}\n Preds shape: {predictions.shape}')
             # print(f'Median: {torch.median(predictions)}')
             # sigmoid
-            predictions = torch.sigmoid(predictions)
             loss = loss_fn(predictions, targets)
         # backward
         optimizer.zero_grad()
@@ -85,9 +84,9 @@ def train():
     # 3 channels in for RGB images, 1 channel out for binary mask
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device)
     
-    # loss_fn = torch.nn.BCEWithLogitsLoss()
+    loss_fn = torch.nn.BCEWithLogitsLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
-    loss_fn = EpicLoss() # Custom loss
+    # loss_fn = EpicLoss() # Custom loss
     # loss_fn = IoULoss() # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     
