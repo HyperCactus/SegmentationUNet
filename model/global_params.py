@@ -2,7 +2,7 @@
 Global parameters for the UNet model defined here for easy access across files.
 """
 
-HPC = False
+HPC = True
 
 # Hyperparameters
 LEARNING_RATE = 1e-4
