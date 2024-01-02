@@ -48,13 +48,14 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
         scaler (torch.cuda.amp.GradScaler): The gradient scaler
         losses (list): The list to store the losses
     """
-    eval = BinaryDiceScore()
+    # eval = BinaryDiceScore()
     loop = tqdm(loader)
     length = len(loader)
     # loop = loader
     for batch_idx, (data, targets) in enumerate(loop):
         data = data.to(device=device)
-        targets = targets.float().unsqueeze(1).to(device=device)
+        # targets = targets.float().unsqueeze(1).to(device=device)
+        targets = targets.float().to(device=device)
         # forward
         with torch.cuda.amp.autocast():
             predictions = model(data)
@@ -109,8 +110,8 @@ def train():
         # Train the model for one epoch
 
         for kidney in TRAIN_DATASETS:
-            train_loader = create_loader(os.path.join(kidney, 'images'), 
-                                         os.path.join(kidney, 'labels'), 
+            train_loader = create_loader(os.path.join(BASE_PATH, kidney, 'images'), 
+                                         os.path.join(BASE_PATH, kidney, 'labels'), 
                                          BATCH_SIZE, 
                                          transform=TRAIN_TRANSFORMS)
             train_epoch(train_loader, model, optimizer, loss_fn, scaler, train_epoch_losses)
@@ -165,7 +166,7 @@ def train():
     plt.title('Training Losses')
     plt.grid(True)
     plt.savefig('save_data/losses.png')
-    # plt.show()
+    plt.show()
     
     # plot Average Losses per Epoch
     plt.figure(figsize=(20, 10))
@@ -175,7 +176,7 @@ def train():
     plt.title('Average Losses per Epoch')
     plt.grid(True)
     plt.savefig('save_data/epoch_losses.png')
-    # plt.show()
+    plt.show()
     
     # plot dice score vs epoch
     plt.figure(figsize=(20, 10))
@@ -185,7 +186,7 @@ def train():
     plt.title('Validation Surface Dice Scores')
     plt.grid(True)
     plt.savefig('save_data/dice_scores.png')
-    # plt.show()
+    plt.show()
 
 if __name__ == '__main__':
     train()

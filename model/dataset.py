@@ -44,6 +44,9 @@ class SegmenTrainDataset(Dataset):
         image = image / 255.0 # normalize images to be between 0 and 1
         mask = cv2.imread(self.mask_files[index], cv2.IMREAD_GRAYSCALE)
         mask[mask == 255.0] = 1.0 # convert all 255 values to 1.0 to make it a binary mask
+
+        image = image.astype('float32')
+        mask = mask.astype('float32')
         
         if self.transform is not None:    # IMPLEMENT TRANSFORMS HERE
             transformed = self.transform(image=image, mask=mask)
