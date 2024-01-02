@@ -84,10 +84,10 @@ def train():
     # 3 channels in for RGB images, 1 channel out for binary mask
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device)
     
-    loss_fn = torch.nn.BCEWithLogitsLoss()
+    # loss_fn = torch.nn.BCEWithLogitsLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
     # loss_fn = EpicLoss() # Custom loss
-    # loss_fn = IoULoss() # Testing this loss function
+    loss_fn = IoULoss() # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
