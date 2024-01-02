@@ -7,7 +7,7 @@ Global parameters for the UNet model defined here for easy access across files.
 LEARNING_RATE = 1e-4
 BATCH_SIZE = 16
 # BATCH_SIZE = 3 # Laptop
-NUM_EPOCHS = 5#30
+NUM_EPOCHS = 100#30
 NUM_WORKERS = 4
 PIN_MEMORY = True
 PREDICTION_THRESHOLD = 0.5

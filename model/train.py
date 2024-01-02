@@ -188,5 +188,7 @@ def train():
     plt.savefig('save_data/dice_scores.png')
     plt.show()
 
+    print('TRAIN COMPLETE')
+
 if __name__ == '__main__':
     train()
