@@ -82,6 +82,7 @@ TRAIN_TRANSFORMS = A.Compose([
     A.VerticalFlip(p=0.5),
     A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=15, shift_limit=0.1, p=0.8, border_mode=0),
     A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
+    A.Affine(shear=(-10, 10), p=0.5), # Untested addition
     A.OneOf(
         [
             A.Blur(blur_limit=3, p=1),
@@ -94,43 +95,51 @@ TRAIN_TRANSFORMS = A.Compose([
 
 VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=VAL_TRANSFORMS)
 
-# # testing the dataset:
-# for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
-#     # print(f'BATCH {batch_idx+1}')
-#     if batch_idx < 200/BATCH_SIZE:
-#         continue
-#     if batch_idx > (200+BATCH_SIZE)/BATCH_SIZE:
-#         break
-#     print("Batch", batch_idx + 1)
-#     print("Image batch shape:", batch_images.shape)
-#     print("Mask batch shape:", batch_masks.shape)
-    
-#     for image, mask in zip(batch_images, batch_masks):
-       
-#         # image = image.permute((1, 2, 0)).numpy()*255.0;
-#         print(f'image.shape presqueese: {image.shape}')
-#         image = image.squeeze().numpy()*255.0
-#         # image = image.numpy()*255.0
-#         print(f'image.shape postsqueese: {image.shape}')
-#         image = image.astype('uint8')
-#         mask = (mask*255).numpy().astype('uint8')
+kidney_1_voi_loader = create_loader(os.path.join(BASE_PATH, 'kidney_1_voi', 'images'), 
+                                     os.path.join(BASE_PATH, 'kidney_1_voi', 'labels'), 
+                                     BATCH_SIZE, transform=TRAIN_TRANSFORMS)
+
+test_mode = False
+
+if test_mode:
+    # testing the dataset:
+    for batch_idx, (batch_images, batch_masks) in enumerate(kidney_1_voi_loader):
+        # print(f'BATCH {batch_idx+1}')
+        # if batch_idx < 200/BATCH_SIZE:
+        #     continue
+        if batch_idx > (4+BATCH_SIZE)/BATCH_SIZE:
+            break
+        print("Batch", batch_idx + 1)
+        print("Image batch shape:", batch_images.shape)
+        print("Mask batch shape:", batch_masks.shape)
         
-#         # image_filename = os.path.basename(image_path)
-#         # mask_filename = os.path.basename(mask_path)
+        for image, mask in zip(batch_images, batch_masks):
         
-#         plt.figure(figsize=(10, 5))
-        
-#         plt.subplot(1, 2, 1)
-#         plt.imshow(image, cmap='gray')
-#         # plt.title(f"Original Image - {image_filename}")
-        
-#         plt.subplot(1, 2, 2)
-#         plt.imshow(mask, cmap='gray')
-#         # plt.title(f"Mask Image - {mask_filename}")
-        
-#         plt.tight_layout()
-#         plt.show()
-#     break
+            # image = image.permute((1, 2, 0)).numpy()*255.0;
+            print(f'image.shape presqueese: {image.shape}')
+            image = image.squeeze(0).numpy()*255.0
+            # image = image.numpy()*255.0
+            print(f'image.shape postsqueese: {image.shape}')
+            image = image.astype('uint8')
+            mask = (mask*255).numpy().astype('uint8')
+            mask = mask.squeeze(0)
+            
+            # image_filename = os.path.basename(image_path)
+            # mask_filename = os.path.basename(mask_path)
+            
+            plt.figure(figsize=(10, 5))
+            
+            plt.subplot(1, 2, 1)
+            plt.imshow(image, cmap='gray')
+            # plt.title(f"Original Image - {image_filename}")
+            
+            plt.subplot(1, 2, 2)
+            plt.imshow(mask, cmap='gray')
+            # plt.title(f"Mask Image - {mask_filename}")
+            
+            plt.tight_layout()
+            plt.show()
+        break
 
 
 # # ========================================================================================================

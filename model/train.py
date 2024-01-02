@@ -59,6 +59,10 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
         # forward
         with torch.cuda.amp.autocast():
             predictions = model(data)
+            # print(f'Data shape: {data.shape}\n Targets shape: {targets.shape}\n Preds shape: {predictions.shape}')
+            # print(f'Median: {torch.median(predictions)}')
+            # sigmoid
+            predictions = torch.sigmoid(predictions)
             loss = loss_fn(predictions, targets)
         # backward
         optimizer.zero_grad()
@@ -166,7 +170,7 @@ def train():
     plt.title('Training Losses')
     plt.grid(True)
     plt.savefig('save_data/losses.png')
-    plt.show()
+    # plt.show()
     
     # plot Average Losses per Epoch
     plt.figure(figsize=(20, 10))
@@ -176,7 +180,7 @@ def train():
     plt.title('Average Losses per Epoch')
     plt.grid(True)
     plt.savefig('save_data/epoch_losses.png')
-    plt.show()
+    # plt.show()
     
     # plot dice score vs epoch
     plt.figure(figsize=(20, 10))
@@ -186,7 +190,7 @@ def train():
     plt.title('Validation Surface Dice Scores')
     plt.grid(True)
     plt.savefig('save_data/dice_scores.png')
-    plt.show()
+    # plt.show()
 
     print('TRAIN COMPLETE')
 
