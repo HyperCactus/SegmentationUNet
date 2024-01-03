@@ -38,7 +38,8 @@ check_memory = True
 writer = SummaryWriter('runs/SenNet/VascularSegmentation')
 STEP = 0
 
-def train_epoch(loader, model, optimizer, loss_fn, scaler, losses, accuracies=None):
+def train_epoch(loader, model, optimizer, loss_fn, scaler, losses, 
+                accuracies=None, check_memory=check_memory):
     """Trains the model for one epoch
 
     Args:
