@@ -201,6 +201,8 @@ class EpicLoss(nn.Module):
     def forward(self, prediction, targets, smooth=1):
         """Forward pass of the loss function"""
         # comment out if your model contains a sigmoid or equivalent activation layer
+
+        # print(f'PREDS SHAPE: {prediction.shape}, TARGETS SHAPE: {targets.shape}')
                 
         pixel_ratio_loss = torch.abs(prediction - targets)
         

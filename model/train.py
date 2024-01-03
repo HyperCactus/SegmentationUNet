@@ -62,6 +62,10 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
             # print(f'Data shape: {data.shape}\n Targets shape: {targets.shape}\n Preds shape: {predictions.shape}')
             # print(f'Median: {torch.median(predictions)}')
             # sigmoid
+            
+            # predictions shape [batch size, 1, 512, 512], target shape [batch size, 512, 512] must be same
+            # squees out dim 1, so predictions shape [batch size, 512, 512]
+            predictions = torch.squeeze(predictions, dim=1)
             loss = loss_fn(predictions, targets)
         # backward
         optimizer.zero_grad()
