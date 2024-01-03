@@ -33,11 +33,12 @@ if not torch.cuda.is_available():
 
 LOAD_MODEL = False#True
 SAVE_EPOCH_DATA = False#True
+check_memory = True
 
 writer = SummaryWriter('runs/SenNet/VascularSegmentation')
 STEP = 0
 
-def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
+def train_epoch(loader, model, optimizer, loss_fn, scaler, losses, accuracies=None):
     """Trains the model for one epoch
 
     Args:
@@ -47,6 +48,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
         loss_fn (nn.Module): The loss function
         scaler (torch.cuda.amp.GradScaler): The gradient scaler
         losses (list): The list to store the losses
+        accuracies (list): The train accuracies for plotting
     """
     # eval = BinaryDiceScore()
     loop = tqdm(loader)
@@ -69,6 +71,15 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses):
             loss = loss_fn(predictions, targets)
         # backward
         optimizer.zero_grad()
+
+        if check_memory:
+            t = torch.cuda.get_device_properties(0).total_memory
+            a = torch.cuda.memory_allocated(0)
+            global memory_message = f'MEMORY USAGE: {a} out of {t} ({a/t*100:.2f}%)'
+            check_memory = False
+
+        # if batch_idx % 10 == 0:
+        #     preds = (nn.Sigmoid()(predictions)>PREDICTION_THRESHOLD).double()
         
         # print(f'type(loss): {type(loss)}, shape: {loss.shape}')
         # print(f'loss: {loss.item()}')
@@ -107,6 +118,7 @@ def train():
     losses = [] # all training losses
     dice_scores = [] # for plotting
     epoch_losses = [] # average loss for each epoch
+    train_surface_dice_scores = [] # for plotting
     
     model.train()
     
@@ -162,6 +174,8 @@ def train():
         'optimizer': optimizer.state_dict()
     }
     save_checkpoint(checkpoint)
+
+    print(memory_message)
     
     # evaluate_fn()
         

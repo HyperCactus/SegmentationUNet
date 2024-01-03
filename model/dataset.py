@@ -182,10 +182,11 @@ def preprocess_image(prev_path, cur_path, next_path, return_size=False):
     prev = cv2.imread(prev_path, cv2.IMREAD_UNCHANGED)
     cur = cv2.imread(cur_path, cv2.IMREAD_UNCHANGED)
     nex = cv2.imread(next_path, cv2.IMREAD_UNCHANGED)
+    img = cur
     # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     # print(f'fresh process image img.shape: {img.shape}')
-    # img = np.tile(img[...,None],[1, 1, 3]) 
-    img = np.stack((prev, cur, nex), axis=2) # stach the prev cur and next imgs as the 3 channels
+    img = np.tile(img[...,None],[1, 1, 3]) 
+    # img = np.stack((prev, cur, nex), axis=2) # stach the prev cur and next imgs as the 3 channels
     img = img.astype('float32') 
 
     # scaling to 0-1
