@@ -2,7 +2,7 @@
 Global parameters for the UNet model defined here for easy access across files.
 """
 
-HPC = True#False
+HPC = True
 
 # Hyperparameters
 LEARNING_RATE = 1e-4
@@ -12,7 +12,7 @@ NUM_EPOCHS = 4 if HPC else 1
 NUM_WORKERS = 4
 PIN_MEMORY = True
 PREDICTION_THRESHOLD = 0.5
-IN_CHANNELS = 1
+IN_CHANNELS = 3 # I've stacked the previous image, current image, and next image as the input channels
 
 IMAGE_HEIGHT = 512
 IMAGE_WIDTH = 512

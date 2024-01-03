@@ -41,7 +41,22 @@ class SegmenTrainDataset(Dataset):
     def __getitem__(self, index):
         # images and masks are 1 channel greyscale
         image = cv2.imread(self.image_files[index], cv2.IMREAD_GRAYSCALE)
+        if index-1 >= 0:
+            image_prev = cv2.imread(self.image_files[index-1], cv2.IMREAD_GRAYSCALE)
+        else:
+            image_prev = image
+        if index+1 < len(self.image_files):
+            image_next = cv2.imread(self.image_files[index+1], cv2.IMREAD_GRAYSCALE)
+        else:
+            image_next = image
+        
+        # convert to 3 channel greyscale using previous and next images as first and last channels
+        image = np.stack((image_prev, image, image_next), axis=2)
+
         image = image / 255.0 # normalize images to be between 0 and 1
+        # image_prev = image_prev / 255.0
+        # image_next = image_next / 255.0
+
         mask = cv2.imread(self.mask_files[index], cv2.IMREAD_GRAYSCALE)
         mask[mask == 255.0] = 1.0 # convert all 255 values to 1.0 to make it a binary mask
 
@@ -100,6 +115,7 @@ kidney_1_voi_loader = create_loader(os.path.join(BASE_PATH, 'kidney_1_voi', 'ima
                                      BATCH_SIZE, transform=TRAIN_TRANSFORMS)
 
 test_mode = False
+# print(len(kidney_1_voi_loader))
 
 if test_mode:
     # testing the dataset:
@@ -107,7 +123,7 @@ if test_mode:
         # print(f'BATCH {batch_idx+1}')
         # if batch_idx < 200/BATCH_SIZE:
         #     continue
-        if batch_idx > (4+BATCH_SIZE)/BATCH_SIZE:
+        if batch_idx > (4):
             break
         print("Batch", batch_idx + 1)
         print("Image batch shape:", batch_images.shape)
@@ -115,11 +131,11 @@ if test_mode:
         
         for image, mask in zip(batch_images, batch_masks):
         
-            # image = image.permute((1, 2, 0)).numpy()*255.0;
-            print(f'image.shape presqueese: {image.shape}')
-            image = image.squeeze(0).numpy()*255.0
+            image = image.permute((1, 2, 0)).numpy()*255.0;
+            print(f'image.shape: {image.shape}')
+            # image = image.squeeze(0).numpy()*255.0
             # image = image.numpy()*255.0
-            print(f'image.shape postsqueese: {image.shape}')
+            # print(f'image.shape postsqueese: {image.shape}')
             image = image.astype('uint8')
             mask = (mask*255).numpy().astype('uint8')
             mask = mask.squeeze(0)
