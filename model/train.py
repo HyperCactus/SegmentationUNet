@@ -75,7 +75,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses, accuracies=No
         if check_memory:
             t = torch.cuda.get_device_properties(0).total_memory
             a = torch.cuda.memory_allocated(0)
-            global memory_message = f'MEMORY USAGE: {a} out of {t} ({a/t*100:.2f}%)'
+            print(f'MEMORY USAGE: {a} out of {t} ({a/t*100:.2f}%)')
             check_memory = False
 
         # if batch_idx % 10 == 0:
@@ -174,8 +174,6 @@ def train():
         'optimizer': optimizer.state_dict()
     }
     save_checkpoint(checkpoint)
-
-    print(memory_message)
     
     # evaluate_fn()
         
