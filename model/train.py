@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from modules import ImprovedUNet
-from dataset import VAL_LOADER, TRAIN_TRANSFORMS, create_loader # TRAIN_LOADER,
+from dataset import VAL_LOADER, create_loader, augment_image # TRAIN_LOADER, TRAIN_TRANSFORMS
 import time
 from utils import *
 from torch.utils.tensorboard import SummaryWriter
@@ -86,8 +86,8 @@ def train():
     
     # loss_fn = torch.nn.BCEWithLogitsLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
-    # loss_fn = EpicLoss() # Custom loss
-    loss_fn = IoULoss() # Testing this loss function
+    loss_fn = EpicLoss() # Custom loss
+    # loss_fn = IoULoss() # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
@@ -116,7 +116,7 @@ def train():
             train_loader = create_loader(os.path.join(BASE_PATH, kidney, 'images'), 
                                          os.path.join(BASE_PATH, kidney, 'labels'), 
                                          BATCH_SIZE, 
-                                         transform=TRAIN_TRANSFORMS)
+                                         transform=augment_image)
             train_epoch(train_loader, model, optimizer, loss_fn, scaler, train_epoch_losses)
         
         # Calculate the average loss for the epoch

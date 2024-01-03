@@ -17,102 +17,267 @@ from glob import glob
 from global_params import *
 
 
-class SegmenTrainDataset(Dataset):
+# class SegmenTrainDataset(Dataset):
     
-    def __init__(self, image_dir, mask_dir, transform=None, 
-                 img_file_ext='.tif', mask_file_ext='.tif'):
+#     def __init__(self, image_dir, mask_dir, transform=None, 
+#                  img_file_ext='.tif', mask_file_ext='.tif'):
+#         self.image_dir = image_dir
+#         self.mask_dir = mask_dir
+#         self.transform = transform
+#         self.tensorize = ToTensorV2()
+#         # self.images = [img for img in os.listdir(self.image_dir) if img.endswith(file_ext)]
+
+#         self.image_files = glob(os.path.join(self.image_dir, f'*{img_file_ext}'))
+#         self.mask_files = glob(os.path.join(self.mask_dir, f'*{mask_file_ext}'))
+        
+#         assert len(self.image_files) == len(self.mask_files), \
+#             f'Number of images and masks do not match. Found {len(self.image_files)} images and {len(self.mask_files)} masks.'
+#         # self.image_list = os.listdir(self.image_dir)
+#         # self.image_list = [os.path.join(self.image_dir, i) for i in self.image_list if i.endswith('.jpg')]
+
+#     def __len__(self):
+#         return len(self.image_files)
+    
+#     def __getitem__(self, index):
+#         # images and masks are 1 channel greyscale
+#         image = cv2.imread(self.image_files[index], cv2.IMREAD_GRAYSCALE)
+#         if index-1 >= 0:
+#             image_prev = cv2.imread(self.image_files[index-1], cv2.IMREAD_GRAYSCALE)
+#         else:
+#             image_prev = image
+#         if index+1 < len(self.image_files):
+#             image_next = cv2.imread(self.image_files[index+1], cv2.IMREAD_GRAYSCALE)
+#         else:
+#             image_next = image
+        
+#         # convert to 3 channel greyscale using previous and next images as first and last channels
+#         image = np.stack((image_prev, image, image_next), axis=2)
+
+#         image = image / 255.0 # normalize images to be between 0 and 1
+#         # image_prev = image_prev / 255.0
+#         # image_next = image_next / 255.0
+
+#         mask = cv2.imread(self.mask_files[index], cv2.IMREAD_GRAYSCALE)
+#         mask[mask == 255.0] = 1.0 # convert all 255 values to 1.0 to make it a binary mask
+
+#         image = image.astype('float32')
+#         mask = mask.astype('float32')
+        
+#         if self.transform is not None:    # IMPLEMENT TRANSFORMS HERE
+#             transformed = self.transform(image=image, mask=mask)
+#             image = transformed['image']
+#             mask = transformed['mask']
+        
+#         if not isinstance(image, torch.Tensor):
+#             image = self.tensorize(image=image)['image']
+#         if not isinstance(mask, torch.Tensor):
+#             mask = self.tensorize(image=mask)['image']
+        
+#         # the datatype of the images and masks are float32
+#         image = image.type(torch.float32)
+#         mask = mask.type(torch.float32)
+        
+#         return image, mask
+
+# def create_loader(image_dir, mask_dir, batch_size, 
+#                   transform=None, shuffle=False):
+#     dataset = SegmenTrainDataset(image_dir, mask_dir, transform=transform)
+#     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+# VAL_TRANSFORMS = A.Compose([
+#     A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
+#     A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+#     ToTensorV2()
+# ])
+
+# TRAIN_TRANSFORMS = A.Compose([
+#     A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, always_apply=True),
+#     A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
+#     A.HorizontalFlip(p=0.5),
+#     A.VerticalFlip(p=0.5),
+#     A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=15, shift_limit=0.1, p=0.8, border_mode=0),
+#     A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
+#     A.Affine(shear=(-10, 10), p=0.5), # Untested addition
+#     A.OneOf(
+#         [
+#             A.Blur(blur_limit=3, p=1),
+#             A.MotionBlur(blur_limit=3, p=1),
+#         ],
+#         p=0.7,
+#     ),
+#     A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+# ])
+
+
+
+
+#=============================================
+
+class CustomDataset(Dataset):
+    def __init__(self, image_dir, mask_dir, 
+                 input_size=(IMAGE_WIDTH, IMAGE_HEIGHT), 
+                 img_file_ext='tif',
+                 augmentation_transforms=None):
         self.image_dir = image_dir
         self.mask_dir = mask_dir
-        self.transform = transform
-        self.tensorize = ToTensorV2()
-        # self.images = [img for img in os.listdir(self.image_dir) if img.endswith(file_ext)]
-
         self.image_files = glob(os.path.join(self.image_dir, f'*{img_file_ext}'))
-        self.mask_files = glob(os.path.join(self.mask_dir, f'*{mask_file_ext}'))
-        
-        assert len(self.image_files) == len(self.mask_files), \
-            f'Number of images and masks do not match. Found {len(self.image_files)} images and {len(self.mask_files)} masks.'
-        # self.image_list = os.listdir(self.image_dir)
-        # self.image_list = [os.path.join(self.image_dir, i) for i in self.image_list if i.endswith('.jpg')]
+        self.mask_files = glob(os.path.join(self.mask_dir, f'*{img_file_ext}'))
+        self.img_file_ext = img_file_ext
+        self.input_size = input_size
+        self.augmentation_transforms = augmentation_transforms
 
     def __len__(self):
         return len(self.image_files)
-    
-    def __getitem__(self, index):
-        # images and masks are 1 channel greyscale
-        image = cv2.imread(self.image_files[index], cv2.IMREAD_GRAYSCALE)
-        if index-1 >= 0:
-            image_prev = cv2.imread(self.image_files[index-1], cv2.IMREAD_GRAYSCALE)
-        else:
-            image_prev = image
-        if index+1 < len(self.image_files):
-            image_next = cv2.imread(self.image_files[index+1], cv2.IMREAD_GRAYSCALE)
-        else:
-            image_next = image
-        
-        # convert to 3 channel greyscale using previous and next images as first and last channels
-        image = np.stack((image_prev, image, image_next), axis=2)
 
-        image = image / 255.0 # normalize images to be between 0 and 1
-        # image_prev = image_prev / 255.0
-        # image_next = image_next / 255.0
+    def __getitem__(self, idx):
+       
+        image_path = self.image_files[idx]
+        mask_path = self.mask_files[idx]
 
-        mask = cv2.imread(self.mask_files[index], cv2.IMREAD_GRAYSCALE)
-        mask[mask == 255.0] = 1.0 # convert all 255 values to 1.0 to make it a binary mask
+        prev_path = self.image_files[idx-1] if idx-1 >= 0 else image_path
+        next_path = self.image_files[idx+1] if idx+1 < len(self.image_files) else image_path
 
-        image = image.astype('float32')
-        mask = mask.astype('float32')
-        
-        if self.transform is not None:    # IMPLEMENT TRANSFORMS HERE
-            transformed = self.transform(image=image, mask=mask)
-            image = transformed['image']
-            mask = transformed['mask']
-        
-        if not isinstance(image, torch.Tensor):
-            image = self.tensorize(image=image)['image']
-        if not isinstance(mask, torch.Tensor):
-            mask = self.tensorize(image=mask)['image']
-        
-        # the datatype of the images and masks are float32
-        image = image.type(torch.float32)
-        mask = mask.type(torch.float32)
-        
+        image, orig_size = preprocess_image(prev_path=prev_path,
+                                            cur_path=image_path,
+                                            next_path=next_path,
+                                            return_size=True)
+        mask = preprocess_mask(mask_path)
+
+        if self.augmentation_transforms:
+            image, mask = self.augmentation_transforms(image, mask)
+
         return image, mask
 
-def create_loader(image_dir, mask_dir, batch_size, 
+class UsageDataset(Dataset):
+    def __init__(self, image_files, 
+                 input_size=(IMAGE_WIDTH, IMAGE_HEIGHT), 
+                 augmentation_transforms=None):
+        self.image_files = image_files
+        self.input_size = input_size
+        self.augmentation_transforms = augmentation_transforms
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+       
+        image_path = self.image_files[idx]
+        prev_path = self.image_files[idx-1] if idx-1 >= 0 else image_path
+        next_path = self.image_files[idx+1] if idx+1 < len(self.image_files) else image_path
+
+        image, orig_size = preprocess_image(prev_path=prev_path,
+                                            cur_path=image_path,
+                                            next_path=next_path,
+                                            return_size=True)
+        # orig_size = image.shape
+
+        if self.augmentation_transforms:
+            image = self.augmentation_transforms(image)
+
+        return image, torch.tensor(np.array([orig_size[0], orig_size[1]]))
+
+
+def preprocess_image(prev_path, cur_path, next_path, return_size=False):
+    
+    prev = cv2.imread(prev_path, cv2.IMREAD_UNCHANGED)
+    cur = cv2.imread(cur_path, cv2.IMREAD_UNCHANGED)
+    nex = cv2.imread(next_path, cv2.IMREAD_UNCHANGED)
+    # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    # print(f'fresh process image img.shape: {img.shape}')
+    # img = np.tile(img[...,None],[1, 1, 3]) 
+    img = np.stack((prev, cur, nex), axis=2) # stach the prev cur and next imgs as the 3 channels
+    img = img.astype('float32') 
+
+    # scaling to 0-1
+    mx = np.max(img)
+    if mx:
+        img/=mx
+    
+    orig_size = img.shape
+    
+    # print(f'process image img.shape: {img.shape}')
+    img = np.transpose(img, (2, 0, 1))
+    img_ten = torch.tensor(img)
+    if return_size:
+        return img_ten, orig_size
+    else:
+        return img_ten
+
+def preprocess_mask(path):
+    
+    msk = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    msk = msk.astype('float32')
+    msk/=255.0
+    msk_ten = torch.tensor(msk)
+    
+    return msk_ten
+
+def augment_image(image, mask):
+    
+    image_np = image.permute(1, 2, 0).numpy()
+    mask_np = mask.numpy()
+
+    transform = A.Compose([
+        A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, always_apply=True),
+        A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
+        A.HorizontalFlip(p=0.5),
+        A.VerticalFlip(p=0.5),
+        A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=15, shift_limit=0.1, p=0.8, border_mode=0),
+        A.Affine(shear=(-10, 10), p=0.5), # Untested addition
+        A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
+        A.OneOf(
+            [
+                A.Blur(blur_limit=3, p=1),
+                A.MotionBlur(blur_limit=3, p=1),
+            ],
+            p=0.7,
+        ),
+        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+    ])
+
+    augmented = transform(image=image_np, mask=mask_np)
+    augmented_image, augmented_mask = augmented['image'], augmented['mask']
+
+    augmented_image = torch.tensor(augmented_image, dtype=torch.float32).permute(2, 0, 1)
+    augmented_mask = torch.tensor(augmented_mask, dtype=torch.float32)
+
+    return augmented_image, augmented_mask
+
+def val_transform(image, mask):
+    
+    image_np = image.permute(1, 2, 0).numpy()
+    mask_np = mask.numpy()
+
+    transform = A.Compose([
+        A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
+        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+    ])
+
+    augmented = transform(image=image_np, mask=mask_np)
+    augmented_image, augmented_mask = augmented['image'], augmented['mask']
+
+    augmented_image = torch.tensor(augmented_image, dtype=torch.float32).permute(2, 0, 1)
+    augmented_mask = torch.tensor(augmented_mask, dtype=torch.float32)
+
+    return augmented_image, augmented_mask
+
+def create_loader(image_files, mask_files, batch_size, 
                   transform=None, shuffle=False):
-    dataset = SegmenTrainDataset(image_dir, mask_dir, transform=transform)
+    
+    dataset = CustomDataset(image_files, mask_files, augmentation_transforms=transform)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-VAL_TRANSFORMS = A.Compose([
-    A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
-    A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
-    ToTensorV2()
-])
+def create_test_loader(image_files, batch_size, 
+                  augmentations=None, shuffle=False):
+    
+    dataset = UsageDataset(image_files, augmentation_transforms=augmentations)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-TRAIN_TRANSFORMS = A.Compose([
-    A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, always_apply=True),
-    A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
-    A.HorizontalFlip(p=0.5),
-    A.VerticalFlip(p=0.5),
-    A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=15, shift_limit=0.1, p=0.8, border_mode=0),
-    A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
-    A.Affine(shear=(-10, 10), p=0.5), # Untested addition
-    A.OneOf(
-        [
-            A.Blur(blur_limit=3, p=1),
-            A.MotionBlur(blur_limit=3, p=1),
-        ],
-        p=0.7,
-    ),
-    A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
-])
-
-VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=VAL_TRANSFORMS)
+VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform)
 
 kidney_1_voi_loader = create_loader(os.path.join(BASE_PATH, 'kidney_1_voi', 'images'), 
                                      os.path.join(BASE_PATH, 'kidney_1_voi', 'labels'), 
-                                     BATCH_SIZE, transform=TRAIN_TRANSFORMS)
+                                     BATCH_SIZE, transform=augment_image)
 
 test_mode = False
 # print(len(kidney_1_voi_loader))
@@ -138,7 +303,7 @@ if test_mode:
             # print(f'image.shape postsqueese: {image.shape}')
             image = image.astype('uint8')
             mask = (mask*255).numpy().astype('uint8')
-            mask = mask.squeeze(0)
+            # mask = mask.squeeze(0)
             
             # image_filename = os.path.basename(image_path)
             # mask_filename = os.path.basename(mask_path)
