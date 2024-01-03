@@ -31,7 +31,7 @@ if not torch.cuda.is_available():
     exit()
 
 
-LOAD_MODEL = False#True
+LOAD_MODEL = True
 SAVE_EPOCH_DATA = False#True
 check_memory = True
 
