@@ -6,10 +6,10 @@ HPC = True
 
 # Hyperparameters
 # LEARNING_RATE = 1e-4
-LEARNING_RATE = 1e-8
+LEARNING_RATE = 1e-7
 BATCH_SIZE = 16 if HPC else 3
 # BATCH_SIZE = 3 # Laptop
-NUM_EPOCHS = 4 if HPC else 1
+NUM_EPOCHS = 15 if HPC else 1
 NUM_WORKERS = 4
 PIN_MEMORY = True
 PREDICTION_THRESHOLD = 0.6#0.5

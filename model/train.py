@@ -74,9 +74,9 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         optimizer.zero_grad()
 
         if check_memory and batch_idx == 0:
-            t = torch.cuda.get_device_properties(0).total_memory
-            a = torch.cuda.memory_allocated(0)
-            print(f'MEMORY USAGE: {a} out of {t} ({a/t*100:.2f}%)')
+            t = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            a = torch.cuda.memory_allocated(0) / 1024**3
+            print(f'MEMORY USAGE: {a}GB out of {t}GB ({a/t*100:.2f}%)')
             check_memory = False
 
         # if batch_idx % 10 == 0:
