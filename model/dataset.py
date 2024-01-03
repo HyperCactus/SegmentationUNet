@@ -120,8 +120,8 @@ class CustomDataset(Dataset):
                  augmentation_transforms=None):
         self.image_dir = image_dir
         self.mask_dir = mask_dir
-        self.image_files = glob(os.path.join(self.image_dir, f'*{img_file_ext}'))
-        self.mask_files = glob(os.path.join(self.mask_dir, f'*{img_file_ext}'))
+        self.image_files = sorted(glob(os.path.join(self.image_dir, f'*{img_file_ext}')))
+        self.mask_files = sorted(glob(os.path.join(self.mask_dir, f'*{img_file_ext}')))
         self.img_file_ext = img_file_ext
         self.input_size = input_size
         self.augmentation_transforms = augmentation_transforms
@@ -185,8 +185,8 @@ def preprocess_image(prev_path, cur_path, next_path, return_size=False):
     img = cur
     # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     # print(f'fresh process image img.shape: {img.shape}')
-    img = np.tile(img[...,None],[1, 1, 3]) 
-    # img = np.stack((prev, cur, nex), axis=2) # stach the prev cur and next imgs as the 3 channels
+    # img = np.tile(img[...,None],[1, 1, 3]) 
+    img = np.stack((prev, cur, nex), axis=2) # stach the prev cur and next imgs as the 3 channels
     img = img.astype('float32') 
 
     # scaling to 0-1
@@ -220,7 +220,6 @@ def augment_image(image, mask):
 
     transform = A.Compose([
         A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, always_apply=True),
-        A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=15, shift_limit=0.1, p=0.8, border_mode=0),
@@ -228,11 +227,12 @@ def augment_image(image, mask):
         A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
         A.OneOf(
             [
-                A.Blur(blur_limit=3, p=1),
-                A.MotionBlur(blur_limit=3, p=1),
+                A.Blur(blur_limit=3, p=0.9),
+                A.MotionBlur(blur_limit=3, p=0.9),
             ],
             p=0.7,
         ),
+        A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
         A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
     ])
 

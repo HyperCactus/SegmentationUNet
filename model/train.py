@@ -73,7 +73,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         # backward
         optimizer.zero_grad()
 
-        if check_memory:
+        if check_memory and batch_idx == 0:
             t = torch.cuda.get_device_properties(0).total_memory
             a = torch.cuda.memory_allocated(0)
             print(f'MEMORY USAGE: {a} out of {t} ({a/t*100:.2f}%)')
@@ -122,7 +122,7 @@ def train():
     train_surface_dice_scores = [] # for plotting
     
     model.train()
-    
+    check_memory = True
     # Training loop
     start_time = time.time()
     for epoch in range(NUM_EPOCHS):
@@ -134,7 +134,9 @@ def train():
                                          os.path.join(BASE_PATH, kidney, 'labels'), 
                                          BATCH_SIZE, 
                                          transform=augment_image)
-            train_epoch(train_loader, model, optimizer, loss_fn, scaler, train_epoch_losses)
+            train_epoch(train_loader, model, optimizer, loss_fn, scaler, 
+                        train_epoch_losses, check_memory=check_memory)
+            check_memory = False
         
         # Calculate the average loss for the epoch
         average_loss = np.mean(train_epoch_losses)
