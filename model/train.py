@@ -60,7 +60,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         # targets = targets.float().unsqueeze(1).to(device=device)
         targets = targets.float().to(device=device)
         # forward
-        with torch.cuda.amp.autocast():
+        with torch.cuda.amp.autocast() and torch.autograd.detect_anomaly():
             predictions = model(data)
             # print(f'Data shape: {data.shape}\n Targets shape: {targets.shape}\n Preds shape: {predictions.shape}')
             # print(f'Median: {torch.median(predictions)}')
@@ -74,8 +74,8 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
                 print('loss is nan')
                 print(f'predictions: {predictions}')
                 print(f'targets: {targets}')
-                # use exit code 1 to indicate that the model diverged
-                exit(1)
+                # use exit code 3 to indicate that the model diverged
+                exit(3)
         # backward
         optimizer.zero_grad()
 
