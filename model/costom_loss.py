@@ -230,7 +230,13 @@ class ReduceLROnThreshold(_LRScheduler):
         self.mode = mode
         super().__init__(optimizer, **kwargs)
         
-    def step(self, metric):
+    def step(self, metric=None):
+        # need to do this because the scheduler is called before the metric is calculated
+        # in super().__init__(optimizer, **kwargs) in __init__
+        if metric is None:
+            # If no metric is provided, just pass as the base class does nothing in its step method.
+            return
+        
         if self.mode == 'above':
             condition = metric > self.threshold
         elif self.mode == 'below':
@@ -243,4 +249,8 @@ class ReduceLROnThreshold(_LRScheduler):
                 param_group['lr'] *= self.factor
             if self.verbose:
                 print(f"Reducing learning rate to {param_group['lr']} for metric {metric}")
+    
+    # def get_lr(self) -> float:
+    #     """This method needs to be redevined because the original method in _LRScheduler is not implemented."""
+    #     return [group['lr'] for group in self.optimizer.param_groups]
 
