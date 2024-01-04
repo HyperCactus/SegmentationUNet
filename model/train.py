@@ -61,7 +61,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         # targets = targets.float().to(device=device)
         # targets = targets.unsqueeze(1)
         # forward
-        with torch.cuda.amp.autocast():# and torch.autograd.detect_anomaly():
+        with torch.cuda.amp.autocast() and torch.autograd.detect_anomaly():
             predictions = model(data)
             # print(f'Data shape: {data.shape}\n Targets shape: {targets.shape}\n Preds shape: {predictions.shape}')
             # print(f'Median: {torch.median(predictions)}')
