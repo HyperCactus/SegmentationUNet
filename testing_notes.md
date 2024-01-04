@@ -66,6 +66,5 @@ public score: 0.208
 public score: 0.209
 * Local inference using kidney 2 as validation set with same process as kaggle submission, prediction threshold 0.9.
 Surface Dice Score: 0.6954
-* Trained with in_chans = 1 on rangpur for 100 epochs:
-Surface Dice Score: 
+* Average train time on Rangpur = 3 min per epoch
 * Added shear augmentations 

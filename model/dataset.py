@@ -322,16 +322,25 @@ def create_test_loader(image_files, batch_size,
 
 VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform)
 
-kidney_1_voi_loader = create_loader(os.path.join(BASE_PATH, 'kidney_1_voi', 'images'), 
-                                     os.path.join(BASE_PATH, 'kidney_1_voi', 'labels'), 
-                                     BATCH_SIZE, transform=augment_image, shuffle=True)
+# kidney_1_voi_loader = create_loader(os.path.join(BASE_PATH, 'kidney_1_voi', 'images'), 
+#                                      os.path.join(BASE_PATH, 'kidney_1_voi', 'labels'), 
+#                                      BATCH_SIZE, transform=augment_image, shuffle=True)
+image_dirs = []
+mask_dirs = []
+for kidney in TRAIN_DATASETS:
+    image_dirs.append(os.path.join(BASE_PATH, kidney, 'images'))
+    mask_dirs.append(os.path.join(BASE_PATH, kidney, 'labels'))
+
+TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE, 
+                            transform=augment_image, shuffle=True)
+
 
 test_mode = False
 # print(len(kidney_1_voi_loader))
 
 if test_mode:
     # testing the dataset:
-    for batch_idx, (batch_images, batch_masks) in enumerate(kidney_1_voi_loader):
+    for batch_idx, (batch_images, batch_masks) in enumerate(TRAIN_LOADER):
         # print(f'BATCH {batch_idx+1}')
         # if batch_idx < 200/BATCH_SIZE:
         #     continue

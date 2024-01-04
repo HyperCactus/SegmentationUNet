@@ -161,7 +161,7 @@ def save_predictions_as_imgs(loader, model, num, folder='saved_images/', device=
             x = x.to(device)
             y = y.to(device) # add 1 channel to mask
             preds = torch.sigmoid(model(x))
-            preds = (preds > 0.6).float()
+            preds = (preds > PREDICTION_THRESHOLD).float()
             torchvision.utils.save_image(preds, f'{preds_path}pred_{idx+1}.png')
             torchvision.utils.save_image(y.unsqueeze(1), f'{masks_path}mask_{idx+1}.png')
             torchvision.utils.save_image(x, f'{orig_path}orig_{idx+1}.png')

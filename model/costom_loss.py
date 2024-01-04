@@ -4,6 +4,7 @@ Coppied from https://www.kaggle.com/code/aniketkolte04/sennet-hoa-seg-pytorch-at
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import _LRScheduler
 
 
 
@@ -181,8 +182,8 @@ class BinaryDiceLoss(nn.Module):
 
 class EpicLoss(nn.Module):
     def __init__(self, weight=None, size_average=True, eps=1e-7, 
-                 ratio_weight=0.5, iou_weight=0.7, 
-                 focal_weight=0.0, cross_entropy_weight=0.3):
+                 ratio_weight=0.0, iou_weight=0.5, 
+                 focal_weight=0.0, cross_entropy_weight=0.5):
         """Initialize the loss function"""
         
         super(EpicLoss, self).__init__()
@@ -218,3 +219,28 @@ class EpicLoss(nn.Module):
             #    (self.ratio_weight * pixel_ratio_loss)
         
         return loss
+class ReduceLROnThreshold(_LRScheduler):
+    """Writtern by GPT 4.
+    Reduces learning rate when a metric has passed a threshold.
+    """
+    def __init__(self, optimizer, threshold, factor=0.1, mode='above', verbose=False, **kwargs):
+        self.threshold = threshold
+        self.factor = factor
+        self.verbose = verbose
+        self.mode = mode
+        super().__init__(optimizer, **kwargs)
+        
+    def step(self, metric):
+        if self.mode == 'above':
+            condition = metric > self.threshold
+        elif self.mode == 'below':
+            condition = metric < self.threshold
+        else:
+            raise ValueError(f"mode must be 'above' or 'below', got {self.mode}")
+        
+        if condition:
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] *= self.factor
+            if self.verbose:
+                print(f"Reducing learning rate to {param_group['lr']} for metric {metric}")
+

@@ -3,7 +3,7 @@ Loads the model and runs it on the test set. Saves the predictions to a folder f
 and calculates the dice score on the test set.
 """
 
-from dataset import *
+from dataset import VAL_LOADER, val_transform
 import torch
 from utils import *
 from modules import ImprovedUNet
@@ -100,8 +100,11 @@ def main():
     # # dice_score, iou_score = evaluate(model, VAL_LOADER, device=device, verbose=True, score_type='both')
     # print(f'Validation Dice Score: {dice_score:.4f}')
     # # print(f'Validation IoU Score: {iou_score:.4f}')
+
+    VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform, shuffle=True)
     
-    save_predictions_as_imgs(VAL_LOADER, model, num=30, folder='saved_images/', device=device)
+    save_predictions_as_imgs(VAL_LOADER, model, num=30, 
+                             folder='saved_images/', device=device)
 
     plot_samples(6, title='Predictions', include_image=True)
 

@@ -8,11 +8,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from modules import ImprovedUNet
-from dataset import VAL_LOADER, create_loader, augment_image # TRAIN_LOADER, TRAIN_TRANSFORMS
+from dataset import VAL_LOADER, TRAIN_LOADER, create_loader, augment_image # TRAIN_TRANSFORMS
 import time
 from utils import *
 from torch.utils.tensorboard import SummaryWriter
-from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss
+from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold
 from global_params import * # Hyperparameters and other global variables
 from evaluate import surface_dice
 
@@ -39,7 +39,7 @@ writer = SummaryWriter('runs/SenNet/VascularSegmentation')
 STEP = 0
 
 def train_epoch(loader, model, optimizer, loss_fn, scaler, losses, 
-                accuracies=None, check_memory=check_memory):
+                accuracies=None, check_memory=check_memory, variances=[]):
     """Trains the model for one epoch
 
     Args:
@@ -111,6 +111,7 @@ def train():
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True, factor=0.1)
+    # scheduler = ReduceLROnThreshold(optimizer, threshold=0.3, mode='above', verbose=True, factor=0.1)
     
     # load model if LOAD_MODEL is True
     if LOAD_MODEL:
@@ -122,6 +123,7 @@ def train():
     dice_scores = [] # for plotting
     epoch_losses = [] # average loss for each epoch
     train_surface_dice_scores = [] # for plotting
+    epoch_variances = [] # average loss variance for each epoch
     
     model.train()
     check_memory = True
@@ -129,23 +131,16 @@ def train():
     start_time = time.time()
     for epoch in range(NUM_EPOCHS):
         train_epoch_losses = [] # train losses for the epoch
+        train_epoch_variances = [] # train loss variance for the epoch
         # Train the model for one epoch
-
-        image_dirs = []
-        mask_dirs = []
-        for kidney in TRAIN_DATASETS:
-            image_dirs.append(os.path.join(BASE_PATH, kidney, 'images'))
-            mask_dirs.append(os.path.join(BASE_PATH, kidney, 'labels'))
-
-        train_loader = create_loader(image_dirs, mask_dirs, BATCH_SIZE, 
-                                    transform=augment_image, shuffle=True)
-        train_epoch(train_loader, model, optimizer, loss_fn, scaler, 
-                    train_epoch_losses, check_memory=check_memory)
+        train_epoch(TRAIN_LOADER, model, optimizer, loss_fn, scaler, 
+                    train_epoch_losses, check_memory=check_memory, variances=train_epoch_variances)
         check_memory = False
         
         # Calculate the average loss for the epoch
         average_loss = np.mean(train_epoch_losses)
         epoch_loss_variance = np.var(train_epoch_losses)
+        epoch_variances.append(np.mean(epoch_loss_variance))
         epoch_losses.append(average_loss)
         losses.extend(train_epoch_losses)
         
@@ -215,6 +210,16 @@ def train():
     plt.title('Validation Surface Dice Scores')
     plt.grid(True)
     plt.savefig('save_data/dice_scores.png')
+    # plt.show()
+
+    # plot loss variance vs epoch
+    plt.figure(figsize=(20, 10))
+    plt.plot(epoch_variances, label='Loss Variance')
+    plt.xlabel('Epoch #')
+    plt.ylabel('Train Loss Variance')
+    plt.title('Average Loss Variance per Epoch')
+    plt.grid(True)
+    plt.savefig('save_data/epoch_variances.png')
     # plt.show()
 
     print('TRAIN COMPLETE')
