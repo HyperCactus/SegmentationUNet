@@ -61,7 +61,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         # targets = targets.float().to(device=device)
         # targets = targets.unsqueeze(1)
         # forward
-        with torch.cuda.amp.autocast() and torch.autograd.detect_anomaly():
+        with torch.cuda.amp.autocast():# and torch.autograd.detect_anomaly():
             predictions = model(data)
             # print(f'Data shape: {data.shape}\n Targets shape: {targets.shape}\n Preds shape: {predictions.shape}')
             # print(f'Median: {torch.median(predictions)}')
@@ -118,7 +118,7 @@ def train():
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True, factor=0.1)
-    scheduler = ReduceLROnThreshold(optimizer, threshold=0.001, mode='above', verbose=True, factor=0.1)
+    scheduler = ReduceLROnThreshold(optimizer, threshold=0.01, mode='above', verbose=True, factor=0.1)
     
     # load model if LOAD_MODEL is True
     if LOAD_MODEL:
@@ -146,7 +146,7 @@ def train():
         
         # Calculate the average loss for the epoch
         average_loss = np.mean(train_epoch_losses)
-        average_loss_variance = np.mean(train_epoch_variances)
+        # average_loss_variance = np.mean(train_epoch_variances)
         epoch_loss_variance = np.var(train_epoch_losses)
         epoch_variances.append(np.mean(epoch_loss_variance))
         epoch_losses.append(average_loss)
@@ -154,7 +154,7 @@ def train():
         
         # Update the learning rate
         # scheduler.step(epoch_losses[-1])
-        scheduler.step(average_loss_variance)
+        scheduler.step(epoch_variances[-1])
         
         # Calculate the validation dice score after each epoch
         # val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)
@@ -163,7 +163,7 @@ def train():
         dice_scores.append(val_dice_score)
         print(f'Validation dice score: {val_dice_score}')
         print(f'Average epoch loss: {average_loss:.4f}')
-        print(f'Epoch loss variance: {epoch_loss_variance:.4f}')
+        print(f'Epoch loss variance: {epoch_variances[-1]:.4f}')
             
         # Print some feedback after each epoch
         print_progress(start_time, epoch, NUM_EPOCHS)
