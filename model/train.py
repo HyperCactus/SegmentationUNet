@@ -70,6 +70,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
             # squees out dim 1, so predictions shape [batch size, 512, 512]
             predictions = torch.squeeze(predictions, dim=1)
             loss = loss_fn(predictions, targets)
+            if loss.isnan():
         # backward
         optimizer.zero_grad()
 
@@ -110,8 +111,8 @@ def train():
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True, factor=0.1)
-    # scheduler = ReduceLROnThreshold(optimizer, threshold=0.3, mode='above', verbose=True, factor=0.1)
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True, factor=0.1)
+    scheduler = ReduceLROnThreshold(optimizer, threshold=0.001, mode='above', verbose=True, factor=0.1)
     
     # load model if LOAD_MODEL is True
     if LOAD_MODEL:
@@ -139,13 +140,15 @@ def train():
         
         # Calculate the average loss for the epoch
         average_loss = np.mean(train_epoch_losses)
+        average_loss_variance = np.mean(train_epoch_variances)
         epoch_loss_variance = np.var(train_epoch_losses)
         epoch_variances.append(np.mean(epoch_loss_variance))
         epoch_losses.append(average_loss)
         losses.extend(train_epoch_losses)
         
         # Update the learning rate
-        scheduler.step(epoch_losses[-1])
+        # scheduler.step(epoch_losses[-1])
+        scheduler.step(average_loss_variance)
         
         # Calculate the validation dice score after each epoch
         # val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)
