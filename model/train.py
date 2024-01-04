@@ -57,10 +57,11 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
     # loop = loader
     for batch_idx, (data, targets) in enumerate(loop):
         data = data.to(device=device)
-        # targets = targets.float().unsqueeze(1).to(device=device)
-        targets = targets.float().to(device=device)
+        targets = targets.float().unsqueeze(1).to(device=device)
+        # targets = targets.float().to(device=device)
+        # targets = targets.unsqueeze(1)
         # forward
-        with torch.cuda.amp.autocast() and torch.autograd.detect_anomaly():
+        with torch.cuda.amp.autocast():# and torch.autograd.detect_anomaly():
             predictions = model(data)
             # print(f'Data shape: {data.shape}\n Targets shape: {targets.shape}\n Preds shape: {predictions.shape}')
             # print(f'Median: {torch.median(predictions)}')
@@ -68,7 +69,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
             
             # predictions shape [batch size, 1, 512, 512], target shape [batch size, 512, 512] must be same
             # squees out dim 1, so predictions shape [batch size, 512, 512]
-            predictions = torch.squeeze(predictions, dim=1)
+            # predictions = torch.squeeze(predictions, dim=1)
             loss = loss_fn(predictions, targets)
             if loss.isnan():
                 print('loss is nan')
@@ -110,7 +111,7 @@ def train():
     
     # loss_fn = torch.nn.BCEWithLogitsLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
-    loss_fn = EpicLoss() # Custom loss
+    loss_fn = EpicLoss(cross_entropy_weight=0, iou_weight=1) # Custom loss
     # loss_fn = IoULoss() # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     
