@@ -71,6 +71,11 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
             predictions = torch.squeeze(predictions, dim=1)
             loss = loss_fn(predictions, targets)
             if loss.isnan():
+                print('loss is nan')
+                print(f'predictions: {predictions}')
+                print(f'targets: {targets}')
+                # use exit code 1 to indicate that the model diverged
+                exit(1)
         # backward
         optimizer.zero_grad()
 
