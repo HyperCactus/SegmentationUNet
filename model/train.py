@@ -31,7 +31,7 @@ if not torch.cuda.is_available():
     exit()
 
 
-LOAD_MODEL = True
+LOAD_MODEL = False#True
 SAVE_EPOCH_DATA = False#True
 check_memory = True
 
@@ -76,7 +76,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         if check_memory and batch_idx == 0:
             t = torch.cuda.get_device_properties(0).total_memory / 1024**3
             a = torch.cuda.memory_allocated(0) / 1024**3
-            print(f'MEMORY USAGE: {a}GB out of {t}GB ({a/t*100:.2f}%)')
+            print(f'MEMORY USAGE: {a:.2f}GB out of {t:.2f}GB ({a/t*100:.2f}%)')
             check_memory = False
 
         # if batch_idx % 10 == 0:
@@ -89,12 +89,14 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         scaler.step(optimizer)
         scaler.update()
         losses.append(loss.item())
+        var = np.var(losses)
+        # stabillity = 1 / (1 + var)
         global STEP
         writer.add_scalar('train_batch_loss', loss.item(), STEP)
         STEP += 1
         
         # update tqdm loop
-        loop.set_postfix(loss=loss.item())
+        loop.set_postfix(loss=loss.item(), var=var)
 
 def train():    
     # 3 channels in for RGB images, 1 channel out for binary mask
@@ -129,17 +131,21 @@ def train():
         train_epoch_losses = [] # train losses for the epoch
         # Train the model for one epoch
 
+        image_dirs = []
+        mask_dirs = []
         for kidney in TRAIN_DATASETS:
-            train_loader = create_loader(os.path.join(BASE_PATH, kidney, 'images'), 
-                                         os.path.join(BASE_PATH, kidney, 'labels'), 
-                                         BATCH_SIZE, 
-                                         transform=augment_image)
-            train_epoch(train_loader, model, optimizer, loss_fn, scaler, 
-                        train_epoch_losses, check_memory=check_memory)
-            check_memory = False
+            image_dirs.append(os.path.join(BASE_PATH, kidney, 'images'))
+            mask_dirs.append(os.path.join(BASE_PATH, kidney, 'labels'))
+
+        train_loader = create_loader(image_dirs, mask_dirs, BATCH_SIZE, 
+                                    transform=augment_image, shuffle=True)
+        train_epoch(train_loader, model, optimizer, loss_fn, scaler, 
+                    train_epoch_losses, check_memory=check_memory)
+        check_memory = False
         
         # Calculate the average loss for the epoch
         average_loss = np.mean(train_epoch_losses)
+        epoch_loss_variance = np.var(train_epoch_losses)
         epoch_losses.append(average_loss)
         losses.extend(train_epoch_losses)
         
@@ -153,6 +159,7 @@ def train():
         dice_scores.append(val_dice_score)
         print(f'Validation dice score: {val_dice_score}')
         print(f'Average epoch loss: {average_loss:.4f}')
+        print(f'Epoch loss variance: {epoch_loss_variance:.4f}')
             
         # Print some feedback after each epoch
         print_progress(start_time, epoch, NUM_EPOCHS)

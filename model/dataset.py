@@ -116,26 +116,70 @@ from global_params import *
 class CustomDataset(Dataset):
     def __init__(self, image_dir, mask_dir, 
                  input_size=(IMAGE_WIDTH, IMAGE_HEIGHT), 
-                 img_file_ext='tif',
+                 img_file_ext='tif', mask_file_ext='tif',
                  augmentation_transforms=None):
-        self.image_dir = image_dir
-        self.mask_dir = mask_dir
-        self.image_files = sorted(glob(os.path.join(self.image_dir, f'*{img_file_ext}')))
-        self.mask_files = sorted(glob(os.path.join(self.mask_dir, f'*{img_file_ext}')))
+        
+        self.image_dirs = [image_dir] if isinstance(image_dir, str) else image_dir
+        self.mask_dirs = [mask_dir] if isinstance(mask_dir, str) else mask_dir
+
+        self.image_files = []
+        self.mask_files = []
+        for image_dir, mask_dir in zip(self.image_dirs, self.mask_dirs):
+            self.image_files.append(glob(os.path.join(image_dir, f'*{img_file_ext}')))
+            self.mask_files.append(glob(os.path.join(mask_dir, f'*{mask_file_ext}')))
+
         self.img_file_ext = img_file_ext
+        self.mask_file_ext = mask_file_ext
         self.input_size = input_size
         self.augmentation_transforms = augmentation_transforms
 
+        self.start_indicies = [0]
+        for image_files in self.image_files:
+            self.start_indicies.append(self.start_indicies[-1] + len(image_files))
+        # print([len(image_files) for image_files in self.image_files])
+    
+    def _indexing(self, idx):
+        """
+        The dataset consists of a list of lists of image and mask files, given an index
+        for the overall dataset, we need to find the index fo the image and mask files in
+        their respective lists.
+        Returns: tuple of (index of the list of image files, index of the image file in the list)
+        """
+        total_length = self.__len__()
+        assert idx < total_length, f'idx: {idx} must be less than total_length: {total_length}'
+        
+        for i, start_index in enumerate(self.start_indicies):
+            if idx < start_index:
+                return i-1, idx - self.start_indicies[i-1]
+                break
+        
+        return len(self.start_indicies)-1, idx - self.start_indicies[-1]
+
     def __len__(self):
-        return len(self.image_files)
+        return sum([len(image_files) for image_files in self.image_files])
 
     def __getitem__(self, idx):
-       
-        image_path = self.image_files[idx]
-        mask_path = self.mask_files[idx]
 
-        prev_path = self.image_files[idx-1] if idx-1 >= 0 else image_path
-        next_path = self.image_files[idx+1] if idx+1 < len(self.image_files) else image_path
+        # this is because there are multiple image directories with different image sizes
+        # so the cannot always be stacked into a single tensor
+        
+        # start_idx = 0 # the starting index of the current image file list
+        # for i, image_list in enumerate(self.image_files):
+        #     if idx > start_idx and idx < start_idx + len(image_list)-1: # -1 because of zero indexing
+        #         mask_list = self.mask_files[i]
+        #         idx -= start_idx
+        #         break
+        #     start_idx += len(image_list)-1 # -1 because of zero indexing
+
+        img_list_idx, img_idx = self._indexing(idx)
+       
+        image_path = self.image_files[img_list_idx][img_idx]
+        mask_path = self.mask_files[img_list_idx][img_idx]
+
+        prev_path = self.image_files[img_list_idx][img_idx-1] if \
+            img_idx-1 >= 0 else image_path
+        next_path = self.image_files[img_list_idx][img_idx+1] if \
+            img_idx+1 < len(self.image_files[img_list_idx]) else image_path
 
         image, orig_size = preprocess_image(prev_path=prev_path,
                                             cur_path=image_path,
@@ -185,7 +229,9 @@ def preprocess_image(prev_path, cur_path, next_path, return_size=False):
     img = cur
     # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     # print(f'fresh process image img.shape: {img.shape}')
-    # img = np.tile(img[...,None],[1, 1, 3]) 
+    # img = np.tile(img[...,None],[1, 1, 3])
+    assert prev.shape == cur.shape == nex.shape, f'prev shape: {prev.shape}, cur shape: \
+            {cur.shape}, nex shape: {nex.shape} must be the same!'
     img = np.stack((prev, cur, nex), axis=2) # stach the prev cur and next imgs as the 3 channels
     img = img.astype('float32') 
 
@@ -219,7 +265,6 @@ def augment_image(image, mask):
     mask_np = mask.numpy()
 
     transform = A.Compose([
-        A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, always_apply=True),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=15, shift_limit=0.1, p=0.8, border_mode=0),
@@ -232,7 +277,8 @@ def augment_image(image, mask):
             ],
             p=0.7,
         ),
-        A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
+        A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, always_apply=True),
+        A.Resize(IMAGE_HEIGHT, IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
         A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
     ])
 
@@ -278,7 +324,7 @@ VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_
 
 kidney_1_voi_loader = create_loader(os.path.join(BASE_PATH, 'kidney_1_voi', 'images'), 
                                      os.path.join(BASE_PATH, 'kidney_1_voi', 'labels'), 
-                                     BATCH_SIZE, transform=augment_image)
+                                     BATCH_SIZE, transform=augment_image, shuffle=True)
 
 test_mode = False
 # print(len(kidney_1_voi_loader))

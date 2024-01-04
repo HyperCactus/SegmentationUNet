@@ -101,9 +101,9 @@ def main():
     # print(f'Validation Dice Score: {dice_score:.4f}')
     # # print(f'Validation IoU Score: {iou_score:.4f}')
     
-    # save_predictions_as_imgs(VAL_LOADER, model, num=30, folder='saved_images/', device=device)
+    save_predictions_as_imgs(VAL_LOADER, model, num=30, folder='saved_images/', device=device)
 
-    # plot_samples(6, title='Predictions', include_image=True)
+    plot_samples(6, title='Predictions', include_image=True)
 
 if __name__ == '__main__':
     main()
