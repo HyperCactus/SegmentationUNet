@@ -6,6 +6,7 @@ A CNN model based on the Improved UNet architecture, with associated modules.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision.functional as TF
 import numpy as np
 
 
@@ -125,6 +126,12 @@ class AttentionBlock(nn.Module):
         """
         g1 = self.W_gate(gate)
         x1 = self.W_x(skip_connection)
+
+        if g1.shape != x1.shape:
+            print(f'DEBUG LOG: g1 shape: {g1.shape}, x1 shape: {x1.shape}. \
+                  Resizing x1 to match g1 in attention block.')
+            x1 = TF.resize(x1, g1.shape[2:])
+
         psi = self.relu(g1 + x1)
         psi = self.psi(psi)
         out = skip_connection * psi

@@ -111,7 +111,7 @@ def train():
     
     # loss_fn = torch.nn.BCEWithLogitsLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
-    loss_fn = EpicLoss(cross_entropy_weight=0, iou_weight=1) # Custom loss
+    loss_fn = EpicLoss(cross_entropy_weight=1, iou_weight=0) # Custom loss
     # loss_fn = IoULoss() # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     
@@ -164,6 +164,7 @@ def train():
         print(f'Validation dice score: {val_dice_score}')
         print(f'Average epoch loss: {average_loss:.4f}')
         print(f'Epoch loss variance: {epoch_variances[-1]:.4f}')
+        print(f'Actual Learning Rate: {optimizer.param_groups[0]["lr"]:.4e}')
             
         # Print some feedback after each epoch
         print_progress(start_time, epoch, NUM_EPOCHS)
