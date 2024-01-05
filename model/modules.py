@@ -6,7 +6,7 @@ A CNN model based on the Improved UNet architecture, with associated modules.
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torchvision.functional as TF
+import torch.nn.functional as TF
 import numpy as np
 
 
