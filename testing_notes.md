@@ -68,3 +68,6 @@ public score: 0.209
 Surface Dice Score: 0.6954
 * Average train time on Rangpur = 3 min per epoch
 * Added shear augmentations 
+
+* for tta: `pred = model(non augmented)`
+`pred *= model(tta image)/THRESHOLD`
