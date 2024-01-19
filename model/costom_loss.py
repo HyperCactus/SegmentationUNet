@@ -180,6 +180,19 @@ class BinaryDiceLoss(nn.Module):
             raise Exception('Unexpected reduction {}'.format(self.reduction))
 
 
+# class GPUMemoryLoss(nn.Module):
+#     def __init__(self, weight=1, size_average=True, eps=1e-7):
+#         super(GPUMemoryLoss, self).__init__()
+#         self.weight = weight
+
+#     def forward(self, prediction=None, targets=None):
+#         t = torch.cuda.get_device_properties(0).total_memory / 1024**3
+#         a = torch.cuda.memory_allocated(0) / 1024**3
+#         loss = (a / t) * self.weight
+        
+
+
+
 class EpicLoss(nn.Module):
     def __init__(self, weight=None, size_average=True, eps=1e-7, 
                  ratio_weight=0.0, iou_weight=0.5, 

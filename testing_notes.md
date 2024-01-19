@@ -71,3 +71,21 @@ Surface Dice Score: 0.6954
 
 * for tta: `pred = model(non augmented)`
 `pred *= model(tta image)/THRESHOLD`
+
+* added simple tiling:
+public score -> 0.474
+
+* added advanced tiling with averaging on overlap, increasing tile size is like TTA, tiles = 6x6 (on subset of k2):
+local Surface Dice Score: 0.9749
+
+* advanced tiling, no TTA, 6x6 tiles:
+public score -> 0.524
+
+* local 3D Surface Dice Score computation on k2 subset with TTA and 5x4 tiles, using min max norm:
+3D Surface Dice Score: 0.8113647134695395
+
+* local 3D Surface Dice Score computation on k2 subset with TTA and 5x4 tiles, using /255 norm:
+3D Surface Dice Score: 0.8560464274635169
+
+* local 3D Surface Dice Score computation on k2 subset with TTA and 8x6 tiles, using /255 norm:
+3D Surface Dice Score: 0.8622700067466642

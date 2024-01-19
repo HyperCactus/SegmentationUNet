@@ -200,7 +200,8 @@ def train():
     plt.title('Training Losses')
     plt.grid(True)
     plt.savefig('save_data/losses.png')
-    # plt.show()
+    if not HPC:
+        plt.show()
     
     # plot Average Losses per Epoch
     plt.figure(figsize=(20, 10))
@@ -210,7 +211,8 @@ def train():
     plt.title('Average Losses per Epoch')
     plt.grid(True)
     plt.savefig('save_data/epoch_losses.png')
-    # plt.show()
+    if not HPC:
+        plt.show()
     
     # plot dice score vs epoch
     plt.figure(figsize=(20, 10))
@@ -220,7 +222,8 @@ def train():
     plt.title('Validation Surface Dice Scores')
     plt.grid(True)
     plt.savefig('save_data/dice_scores.png')
-    # plt.show()
+    if not HPC:
+        plt.show()
 
     # plot loss variance vs epoch
     plt.figure(figsize=(20, 10))
@@ -230,7 +233,8 @@ def train():
     plt.title('Average Loss Variance per Epoch')
     plt.grid(True)
     plt.savefig('save_data/epoch_variances.png')
-    # plt.show()
+    if not HPC:
+        plt.show()
 
     print('TRAIN COMPLETE')
 
