@@ -101,3 +101,12 @@ public score -> 0.524
 3D Surface Dice Score: 0.831656864880501
 
 * Normalization, chop outliers, make kidney invariant
+
+* Rangpur Partitions:
+PARTITION
+cpu
+largecpu
+p100
+kaleen
+a100
+a100-test*

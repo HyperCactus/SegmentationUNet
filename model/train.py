@@ -31,7 +31,7 @@ if not torch.cuda.is_available():
     exit()
 
 
-LOAD_MODEL = True
+LOAD_MODEL = False#True
 SAVE_EPOCH_DATA = False#True
 check_memory = True
 
@@ -158,7 +158,7 @@ def train():
         
         # Calculate the validation dice score after each epoch
         # val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)
-        val_dice_score = surface_dice(model, device=device, loader=VAL_LOADER, data_dir=VAL_DATASET_DIR)
+        val_dice_score = surface_dice(model, device=device, dataset_folder=VAL_DATASET_DIR)
         val_dice_score = np.round(val_dice_score.item(), 4)
         dice_scores.append(val_dice_score)
         print(f'Validation dice score: {val_dice_score}')
