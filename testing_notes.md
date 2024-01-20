@@ -89,3 +89,15 @@ public score -> 0.524
 
 * local 3D Surface Dice Score computation on k2 subset with TTA and 8x6 tiles, using /255 norm:
 3D Surface Dice Score: 0.8622700067466642
+
+* local 3D Surface Dice Score computation on k2 subset with TTA and 3x3 tiles, using /255 norm:
+3D Surface Dice Score: 0.8295686825426427
+
+* local 3D Surface Dice Score computation on k2 subset with TTA and 3x3 tiles, using /255 norm with remove small objects 5:
+3D Surface Dice Score: 0.8319619583782941
+* local 3D Surface Dice Score computation on k2 subset with TTA and 3x3 tiles, using /255 norm with remove small objects 10:
+3D Surface Dice Score: 0.8179505718489243
+* local 3D Surface Dice Score computation on k2 subset with TTA and 3x3 tiles, using /255 norm with remove small objects 3:
+3D Surface Dice Score: 0.831656864880501
+
+* Normalization, chop outliers, make kidney invariant

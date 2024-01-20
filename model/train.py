@@ -31,7 +31,7 @@ if not torch.cuda.is_available():
     exit()
 
 
-LOAD_MODEL = False#True
+LOAD_MODEL = True
 SAVE_EPOCH_DATA = False#True
 check_memory = True
 
@@ -118,7 +118,7 @@ def train():
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus
     # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True, factor=0.1)
-    scheduler = ReduceLROnThreshold(optimizer, threshold=0.01, mode='above', verbose=True, factor=0.1)
+    scheduler = ReduceLROnThreshold(optimizer, threshold=0.02, mode='above', verbose=True, factor=0.1)
     
     # load model if LOAD_MODEL is True
     if LOAD_MODEL:

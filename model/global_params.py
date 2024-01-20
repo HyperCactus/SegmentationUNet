@@ -2,14 +2,14 @@
 Global parameters for the UNet model defined here for easy access across files.
 """
 
-HPC = False#True
+HPC = True
 
 # Hyperparameters
 # LEARNING_RATE = 1e-4
 LEARNING_RATE = 1e-6
 BATCH_SIZE = 16 if HPC else 4
 # BATCH_SIZE = 3 # Laptop
-NUM_EPOCHS = 60 if HPC else 1
+NUM_EPOCHS = 20 if HPC else 1
 NUM_WORKERS = 4
 PIN_MEMORY = True
 PREDICTION_THRESHOLD = 0.6#0.5
