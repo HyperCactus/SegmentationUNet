@@ -9,7 +9,7 @@ HPC = True
 LEARNING_RATE = 1e-6
 BATCH_SIZE = 16 if HPC else 4
 # BATCH_SIZE = 3 # Laptop
-NUM_EPOCHS = 20 if HPC else 1
+NUM_EPOCHS = 8 if HPC else 1
 NUM_WORKERS = 4
 PIN_MEMORY = True
 PREDICTION_THRESHOLD = 0.6#0.5
@@ -21,9 +21,14 @@ IMAGE_WIDTH = 512
 HIGH_PASS_ALPHA = 0.1
 HIGH_PASS_STRENGTH = 0.1
 
+TILES_IN_X = 4
+TILES_IN_Y = 3
+
+TILE_SIZE = 512
+
 CHECKPOINT_DIR = 'checkpoints/checkpoint.pth.tar'
 
-# BASE_PATH = 'data/train'
+# BASE_PATH = 'data/train' if HPC else 'data/train'
 BASE_PATH = 'data_downsampled512/train' if HPC else 'data/train'
 
 VAL_DATASET_DIR = BASE_PATH + '/kidney_2'

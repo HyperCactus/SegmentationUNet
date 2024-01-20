@@ -113,84 +113,176 @@ from global_params import *
 
 #=============================================
 
-class CustomDataset(Dataset):
-    def __init__(self, image_dir, mask_dir, 
-                 input_size=(IMAGE_WIDTH, IMAGE_HEIGHT), 
-                 img_file_ext='tif', mask_file_ext='tif',
-                 augmentation_transforms=None):
+# class CustomDataset(Dataset):
+#     def __init__(self, image_dir, mask_dir, 
+#                  input_size=(IMAGE_WIDTH, IMAGE_HEIGHT), 
+#                  img_file_ext='tif', mask_file_ext='tif',
+#                  augmentation_transforms=None):
         
-        self.image_dirs = [image_dir] if isinstance(image_dir, str) else image_dir
-        self.mask_dirs = [mask_dir] if isinstance(mask_dir, str) else mask_dir
+#         self.image_dirs = [image_dir] if isinstance(image_dir, str) else image_dir
+#         self.mask_dirs = [mask_dir] if isinstance(mask_dir, str) else mask_dir
 
-        self.image_files = []
-        self.mask_files = []
-        for image_dir, mask_dir in zip(self.image_dirs, self.mask_dirs):
-            self.image_files.append(glob(os.path.join(image_dir, f'*{img_file_ext}')))
-            self.mask_files.append(glob(os.path.join(mask_dir, f'*{mask_file_ext}')))
+#         self.image_files = []
+#         self.mask_files = []
+#         for image_dir, mask_dir in zip(self.image_dirs, self.mask_dirs):
+#             self.image_files.append(glob(os.path.join(image_dir, f'*{img_file_ext}')))
+#             self.mask_files.append(glob(os.path.join(mask_dir, f'*{mask_file_ext}')))
 
-        self.img_file_ext = img_file_ext
-        self.mask_file_ext = mask_file_ext
-        self.input_size = input_size
+#         self.img_file_ext = img_file_ext
+#         self.mask_file_ext = mask_file_ext
+#         self.input_size = input_size
+#         self.augmentation_transforms = augmentation_transforms
+
+#         self.start_indicies = [0]
+#         for image_files in self.image_files:
+#             self.start_indicies.append(self.start_indicies[-1] + len(image_files))
+#         # print([len(image_files) for image_files in self.image_files])
+    
+#     def _indexing(self, idx):
+#         """
+#         The dataset consists of a list of lists of image and mask files, given an index
+#         for the overall dataset, we need to find the index fo the image and mask files in
+#         their respective lists.
+#         Returns: tuple of (index of the list of image files, index of the image file in the list)
+#         """
+#         total_length = self.__len__()
+#         assert idx < total_length, f'idx: {idx} must be less than total_length: {total_length}'
+        
+#         for i, start_index in enumerate(self.start_indicies):
+#             if idx < start_index:
+#                 return i-1, idx - self.start_indicies[i-1]
+#                 break
+        
+#         return len(self.start_indicies)-1, idx - self.start_indicies[-1]
+
+#     def __len__(self):
+#         return sum([len(image_files) for image_files in self.image_files])
+
+#     def __getitem__(self, idx):
+
+#         # this is because there are multiple image directories with different image sizes
+#         # so the cannot always be stacked into a single tensor
+        
+#         # start_idx = 0 # the starting index of the current image file list
+#         # for i, image_list in enumerate(self.image_files):
+#         #     if idx > start_idx and idx < start_idx + len(image_list)-1: # -1 because of zero indexing
+#         #         mask_list = self.mask_files[i]
+#         #         idx -= start_idx
+#         #         break
+#         #     start_idx += len(image_list)-1 # -1 because of zero indexing
+
+#         img_list_idx, img_idx = self._indexing(idx)
+       
+#         image_path = self.image_files[img_list_idx][img_idx]
+#         mask_path = self.mask_files[img_list_idx][img_idx]
+
+#         prev_path = self.image_files[img_list_idx][img_idx-1] if \
+#             img_idx-1 >= 0 else image_path
+#         next_path = self.image_files[img_list_idx][img_idx+1] if \
+#             img_idx+1 < len(self.image_files[img_list_idx]) else image_path
+
+#         image, orig_size = preprocess_image(prev_path=prev_path,
+#                                             cur_path=image_path,
+#                                             next_path=next_path,
+#                                             return_size=True)
+#         mask = preprocess_mask(mask_path)
+
+#         if self.augmentation_transforms:
+#             image, mask = self.augmentation_transforms(image, mask)
+
+#         return image, mask
+
+# class UsageDatasetStack(Dataset):
+#     def __init__(self, image_files, 
+#                  input_size=(IMAGE_WIDTH, IMAGE_HEIGHT), 
+#                  augmentation_transforms=None):
+#         self.image_files = image_files
+#         self.input_size = input_size
+#         self.augmentation_transforms = augmentation_transforms
+
+#     def __len__(self):
+#         return len(self.image_files)
+
+#     def __getitem__(self, idx):
+       
+#         image_path = self.image_files[idx]
+#         prev_path = self.image_files[idx-1] if idx-1 >= 0 else image_path
+#         next_path = self.image_files[idx+1] if idx+1 < len(self.image_files) else image_path
+
+#         image, orig_size = preprocess_image(prev_path=prev_path,
+#                                             cur_path=image_path,
+#                                             next_path=next_path,
+#                                             return_size=True)
+#         # orig_size = image.shape
+
+#         if self.augmentation_transforms:
+#             image = self.augmentation_transforms(image)
+
+#         return image, torch.tensor(np.array([orig_size[0], orig_size[1]]))
+
+# def preprocess_image(prev_path, cur_path, next_path, return_size=False):
+    
+#     prev = cv2.imread(prev_path, cv2.IMREAD_UNCHANGED)
+#     cur = cv2.imread(cur_path, cv2.IMREAD_UNCHANGED)
+#     nex = cv2.imread(next_path, cv2.IMREAD_UNCHANGED)
+#     img = cur
+#     # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+#     # print(f'fresh process image img.shape: {img.shape}')
+#     # img = np.tile(img[...,None],[1, 1, 3])
+#     assert prev.shape == cur.shape == nex.shape, f'prev shape: {prev.shape}, cur shape: \
+#             {cur.shape}, nex shape: {nex.shape} must be the same!'
+#     img = np.stack((prev, cur, nex), axis=2) # stach the prev cur and next imgs as the 3 channels
+#     img = img.astype('float32') 
+
+#     # scaling to 0-1
+#     mx = np.max(img)
+#     if mx:
+#         img/=mx
+    
+#     orig_size = img.shape
+    
+#     # print(f'process image img.shape: {img.shape}')
+#     img = np.transpose(img, (2, 0, 1))
+#     img_ten = torch.tensor(img)
+#     if return_size:
+#         return img_ten, orig_size
+#     else:
+#         return img_ten
+
+class CustomDataset(Dataset):
+    def __init__(self, images_path, masks_path, 
+                 augmentation_transforms=None,
+                 img_file_ext='tif', mask_file_ext='tif'):
+        images_path = [images_path] if isinstance(images_path, str) else images_path
+        masks_path = [masks_path] if isinstance(masks_path, str) else masks_path
+        assert len(images_path) == len(masks_path), \
+            f'Number of images and masks do not match. Found {len(images_path)} images and {len(masks_path)} masks.'
+        
+        image_files = []
+        mask_files = []
+        for image_dir, mask_dir in zip(images_path, masks_path):
+            image_files += glob(os.path.join(image_dir, f'*{img_file_ext}'))
+            mask_files += glob(os.path.join(mask_dir, f'*{mask_file_ext}'))
+        self.image_files = image_files
+        self.mask_files = mask_files
         self.augmentation_transforms = augmentation_transforms
 
-        self.start_indicies = [0]
-        for image_files in self.image_files:
-            self.start_indicies.append(self.start_indicies[-1] + len(image_files))
-        # print([len(image_files) for image_files in self.image_files])
-    
-    def _indexing(self, idx):
-        """
-        The dataset consists of a list of lists of image and mask files, given an index
-        for the overall dataset, we need to find the index fo the image and mask files in
-        their respective lists.
-        Returns: tuple of (index of the list of image files, index of the image file in the list)
-        """
-        total_length = self.__len__()
-        assert idx < total_length, f'idx: {idx} must be less than total_length: {total_length}'
-        
-        for i, start_index in enumerate(self.start_indicies):
-            if idx < start_index:
-                return i-1, idx - self.start_indicies[i-1]
-                break
-        
-        return len(self.start_indicies)-1, idx - self.start_indicies[-1]
-
     def __len__(self):
-        return sum([len(image_files) for image_files in self.image_files])
+        return len(self.image_files)
 
     def __getitem__(self, idx):
-
-        # this is because there are multiple image directories with different image sizes
-        # so the cannot always be stacked into a single tensor
-        
-        # start_idx = 0 # the starting index of the current image file list
-        # for i, image_list in enumerate(self.image_files):
-        #     if idx > start_idx and idx < start_idx + len(image_list)-1: # -1 because of zero indexing
-        #         mask_list = self.mask_files[i]
-        #         idx -= start_idx
-        #         break
-        #     start_idx += len(image_list)-1 # -1 because of zero indexing
-
-        img_list_idx, img_idx = self._indexing(idx)
        
-        image_path = self.image_files[img_list_idx][img_idx]
-        mask_path = self.mask_files[img_list_idx][img_idx]
+        image_path = self.image_files[idx]
+        mask_path = self.mask_files[idx]
 
-        prev_path = self.image_files[img_list_idx][img_idx-1] if \
-            img_idx-1 >= 0 else image_path
-        next_path = self.image_files[img_list_idx][img_idx+1] if \
-            img_idx+1 < len(self.image_files[img_list_idx]) else image_path
-
-        image, orig_size = preprocess_image(prev_path=prev_path,
-                                            cur_path=image_path,
-                                            next_path=next_path,
-                                            return_size=True)
+        image = preprocess_image(image_path)
         mask = preprocess_mask(mask_path)
 
         if self.augmentation_transforms:
             image, mask = self.augmentation_transforms(image, mask)
 
         return image, mask
+
 
 class UsageDataset(Dataset):
     def __init__(self, image_files, 
@@ -206,13 +298,8 @@ class UsageDataset(Dataset):
     def __getitem__(self, idx):
        
         image_path = self.image_files[idx]
-        prev_path = self.image_files[idx-1] if idx-1 >= 0 else image_path
-        next_path = self.image_files[idx+1] if idx+1 < len(self.image_files) else image_path
 
-        image, orig_size = preprocess_image(prev_path=prev_path,
-                                            cur_path=image_path,
-                                            next_path=next_path,
-                                            return_size=True)
+        image, orig_size = preprocess_image(image_path, return_size=True)
         # orig_size = image.shape
 
         if self.augmentation_transforms:
@@ -221,25 +308,23 @@ class UsageDataset(Dataset):
         return image, torch.tensor(np.array([orig_size[0], orig_size[1]]))
 
 
-def preprocess_image(prev_path, cur_path, next_path, return_size=False):
-    
-    prev = cv2.imread(prev_path, cv2.IMREAD_UNCHANGED)
-    cur = cv2.imread(cur_path, cv2.IMREAD_UNCHANGED)
-    nex = cv2.imread(next_path, cv2.IMREAD_UNCHANGED)
-    img = cur
+def preprocess_image(path, return_size=False):
+    # print(f'path: {path}')
+    img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     # print(f'fresh process image img.shape: {img.shape}')
-    # img = np.tile(img[...,None],[1, 1, 3])
-    assert prev.shape == cur.shape == nex.shape, f'prev shape: {prev.shape}, cur shape: \
-            {cur.shape}, nex shape: {nex.shape} must be the same!'
-    img = np.stack((prev, cur, nex), axis=2) # stach the prev cur and next imgs as the 3 channels
+    
+    if IN_CHANNELS == 1:
+        img = np.tile(img[...,None],[1, 1, 1])
+    else:
+        img = np.tile(img[...,None],[1, 1, 3]) 
     img = img.astype('float32') 
 
     # scaling to 0-1
     mx = np.max(img)
     if mx:
         img/=mx
-    
+
     orig_size = img.shape
     
     # print(f'process image img.shape: {img.shape}')

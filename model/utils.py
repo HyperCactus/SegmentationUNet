@@ -17,6 +17,7 @@ from torchvision.transforms import PILToTensor
 import random
 import os
 import time
+import math
 from tqdm import tqdm
 import torch
 import torch.nn as nn
@@ -619,3 +620,92 @@ def view_examples(kidney_dirs, pred_folder='preds', num=4,
         plt.show()
 
 
+def batch_tiling_split(image_batch, tile_size, tiles_in_x=0, tiles_in_y=0, debug=False):
+    """
+    Splits a batch of images into evenly spaced tiles of size tile_size x tile_size.
+    Assumes batch shape is [b, c, h, w]
+    Args:
+        image_batch: batch of images to split
+        tile_size: size of tiles to split into
+        tiles_in_x: number of tiles in x direction
+        tiles_in_y: number of tiles in y direction
+    Returns:
+        A list of tiles
+    """
+    b, c, h, w = image_batch.shape
+
+    # Calculate number of tiles if not specified
+    if tiles_in_x == 0:
+        tiles_in_x = math.ceil(w / tile_size)
+    if tiles_in_y == 0:
+        tiles_in_y = math.ceil(h / tile_size)
+
+    # Calculate stride to evenly space tiles
+    stride_x = (w - tile_size) / (tiles_in_x - 1) if tiles_in_x > 1 else 0
+    stride_y = (h - tile_size) / (tiles_in_y - 1) if tiles_in_y > 1 else 0
+
+    if debug:
+        print(f'Image Size: {h}x{w}, Tile Size: {tile_size}x{tile_size}')
+        print(f'Tiles in x: {tiles_in_x}, Tiles in y: {tiles_in_y}')
+        print(f'Stride in x: {stride_x}, Stride in y: {stride_y}')
+
+    tiles = []
+    for i in range(tiles_in_y):
+        for j in range(tiles_in_x):
+            # Calculate start coordinates for the tile
+            start_x = int(j * stride_x)
+            start_y = int(i * stride_y)
+            tile = image_batch[:, :, start_y:start_y + tile_size, start_x:start_x + tile_size]
+            tiles.append(tile)
+
+    return tiles
+
+
+
+def recombine_tiles(tiles, original_size, tile_size, tiles_in_x, tiles_in_y):
+    """
+    Recombines a list of tiled predictions into a single prediction batch.
+    Adjusts edge tiles to fit the original image dimensions.
+    Args:
+        tiles: list of tiled predictions
+        original_size: tuple, size of the original image (height, width)
+        tile_size: size of each tile
+        tiles_in_x: number of tiles in the x direction
+        tiles_in_y: number of tiles in the y direction
+    Returns:
+        A single prediction batch of recombined tiles.
+    """
+    original_height, original_width = original_size
+    b, c, _, _ = tiles[0].shape
+
+    # Create tensors for the recombined prediction and the count for averaging
+    recombined = torch.zeros((b, c, original_height, original_width), dtype=tiles[0].dtype, device=tiles[0].device)
+    count_matrix = torch.zeros_like(recombined)
+
+    tile_index = 0
+    for i in range(tiles_in_y):
+        for j in range(tiles_in_x):
+            # Calculate start coordinates for the tile
+            start_x = j * (tile_size - (tile_size * tiles_in_x - original_width) // (tiles_in_x - 1))
+            start_y = i * (tile_size - (tile_size * tiles_in_y - original_height) // (tiles_in_y - 1))
+            end_x = min(start_x + tile_size, original_width)
+            end_y = min(start_y + tile_size, original_height)
+
+            # Adjust the size of the tile if it's an edge tile
+            tile = tiles[tile_index]
+            if tile.shape[2] != end_y - start_y or tile.shape[3] != end_x - start_x:
+                tile = tile[:, :, :end_y - start_y, :end_x - start_x]
+
+            # Place tile and update count matrix
+            recombined[:, :, start_y:end_y, start_x:end_x] += tile
+            count_matrix[:, :, start_y:end_y, start_x:end_x] += 1
+
+            tile_index += 1
+
+    # Avoid division by zero
+    count_matrix[count_matrix == 0] = 1
+
+    # Average the overlapped regions
+    recombined /= count_matrix
+
+    return recombined

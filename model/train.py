@@ -14,7 +14,7 @@ from utils import *
 from torch.utils.tensorboard import SummaryWriter
 from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold
 from global_params import * # Hyperparameters and other global variables
-from evaluate import surface_dice
+from evaluate import local_surface_dice as surface_dice
 
 # RANGPUR Settings 
 from evaluate import main as evaluate_fn
