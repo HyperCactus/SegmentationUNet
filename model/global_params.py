@@ -7,7 +7,7 @@ HPC = True
 # Hyperparameters
 # LEARNING_RATE = 1e-4
 LEARNING_RATE = 1e-6
-BATCH_SIZE = 16 if HPC else 4
+BATCH_SIZE = 8 if HPC else 4
 # BATCH_SIZE = 3 # Laptop
 NUM_EPOCHS = 8 if HPC else 1
 NUM_WORKERS = 4
