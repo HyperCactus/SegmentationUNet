@@ -83,7 +83,7 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
                        lambda x: torch.flip(x, dims=[2]), 
                        lambda x: torch.flip(torch.flip(x, dims=[2]), dims=[3])]    
             
-        preds = torch.zeros((images.shape[0], 1, orig_shape[0], orig_shape[1]))
+        preds = torch.zeros((images.shape[0], 1, orig_shape[0], orig_shape[1])).to(device)
         
         for tta_fn in tta_lambdas:
             tta_img = tta_fn(images)
