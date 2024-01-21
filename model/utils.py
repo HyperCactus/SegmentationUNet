@@ -21,9 +21,12 @@ import math
 from tqdm import tqdm
 import torch
 import torch.nn as nn
-from costom_loss import IoULoss
+# from costom_loss import IoULoss
 from global_params import *
 from dataset import create_loader#, val_transform
+from torch import Tensor, einsum
+from typing import Any, Callable, Iterable, List, Set, Tuple, TypeVar, Union, cast
+from scipy.ndimage import distance_transform_edt as eucl_distance
 
 val_transform = None
 
@@ -68,40 +71,40 @@ class BinaryDiceScore(nn.Module):
         else:
             raise Exception('Unexpected reduction {}'.format(self.reduction))
 
-def evaluate(model, loader, device='cuda', criterion=None,
-             threshold=0.5, verbose=False, leave_on_train=False,
-             score_type='dice'):
-    """
-    Calculates the average dice score over the entire dataloader
-    """
-    print('>>> Calculating Dice Score')
+# def evaluate(model, loader, device='cuda', criterion=None,
+#              threshold=0.5, verbose=False, leave_on_train=False,
+#              score_type='dice'):
+#     """
+#     Calculates the average dice score over the entire dataloader
+#     """
+#     print('>>> Calculating Dice Score')
     
-    model.eval()
-    dice_scores = []
-    iou_scores = []
-    iou_loss = IoULoss()
-    criterion = BinaryDiceScore() if criterion is None else criterion
-    loop = tqdm(loader) if verbose else loader
+#     model.eval()
+#     dice_scores = []
+#     iou_scores = []
+#     iou_loss = IoULoss()
+#     criterion = BinaryDiceScore() if criterion is None else criterion
+#     loop = tqdm(loader) if verbose else loader
     
-    with torch.no_grad():
-        for _, (x, y) in enumerate(loop):
-            x = x.to(device)
-            y = y.to(device)
-            preds = model(x)
-            preds = (preds > threshold).float() # convert to binary mask
-            dice_scores.append(criterion(preds, y).item())
-            iou_scores.append(1 - iou_loss(preds, y).item())
-    if leave_on_train:
-        model.train()
+#     with torch.no_grad():
+#         for _, (x, y) in enumerate(loop):
+#             x = x.to(device)
+#             y = y.to(device)
+#             preds = model(x)
+#             preds = (preds > threshold).float() # convert to binary mask
+#             dice_scores.append(criterion(preds, y).item())
+#             iou_scores.append(1 - iou_loss(preds, y).item())
+#     if leave_on_train:
+#         model.train()
     
-    mean_dice_score = np.mean(dice_scores)
-    mean_iou_score = np.mean(iou_scores)
-    if score_type == 'dice':
-        return mean_dice_score
-    elif score_type == 'iou':
-        return mean_iou_score
-    elif score_type == 'both':
-        return mean_dice_score, mean_iou_score
+#     mean_dice_score = np.mean(dice_scores)
+#     mean_iou_score = np.mean(iou_scores)
+#     if score_type == 'dice':
+#         return mean_dice_score
+#     elif score_type == 'iou':
+#         return mean_iou_score
+#     elif score_type == 'both':
+#         return mean_dice_score, mean_iou_score
 
 def save_checkpoint(state, filename='checkpoints/checkpoint.pth.tar'):
     """
@@ -709,3 +712,94 @@ def recombine_tiles(tiles, original_size, tile_size, tiles_in_x, tiles_in_y):
     recombined /= count_matrix
 
     return recombined
+
+def simplex(t: Tensor, axis=1) -> bool:
+    _sum = cast(Tensor, t.sum(axis).type(torch.float32))
+    _ones = torch.ones_like(_sum, dtype=torch.float32)
+    return torch.allclose(_sum, _ones)
+
+def uniq(a: Tensor) -> Set:
+    return set(torch.unique(a.cpu()).numpy())
+
+def sset(a: Tensor, sub: Iterable) -> bool:
+    return uniq(a).issubset(sub)
+
+def one_hot(t: Tensor, axis=1) -> bool:
+    return simplex(t, axis) and sset(t, [0, 1])
+
+def probs2class(probs: Tensor) -> Tensor:
+    b, _, *img_shape = probs.shape
+    assert simplex(probs)
+
+    res = probs.argmax(dim=1)
+    assert res.shape == (b, *img_shape)
+
+    return res
+
+def class2one_hot(seg: Tensor, K: int) -> Tensor:
+    # Breaking change but otherwise can't deal with both 2d and 3d
+    # if len(seg.shape) == 3:  # Only w, h, d, used by the dataloader
+    #     return class2one_hot(seg.unsqueeze(dim=0), K)[0]
+
+    assert sset(seg, list(range(K))), (uniq(seg), K)
+
+    b, *img_shape = seg.shape  # type: Tuple[int, ...]
+
+    device = seg.device
+    res = torch.zeros((b, K, *img_shape), dtype=torch.int32, device=device).scatter_(1, seg[:, None, ...], 1)
+
+    assert res.shape == (b, K, *img_shape)
+    assert one_hot(res)
+
+    return res
+
+def one_hot2dist(seg: np.ndarray, resolution: Tuple[float, float, float] = None,
+                 dtype=None) -> np.ndarray:
+    assert one_hot(torch.tensor(seg), axis=0)
+    K: int = len(seg)
+
+    res = np.zeros_like(seg, dtype=dtype)
+    for k in range(K):
+        posmask = seg[k].astype(np.bool)
+
+        if posmask.any():
+            negmask = ~posmask
+            res[k] = eucl_distance(negmask, sampling=resolution) * negmask \
+                - (eucl_distance(posmask, sampling=resolution) - 1) * posmask
+        # The idea is to leave blank the negative classes
+        # since this is one-hot encoded, another class will supervise that pixel
+
+    return res
+
+def one_hot2hd_dist(seg: np.ndarray, resolution: Tuple[float, float, float] = None,
+                    dtype=None) -> np.ndarray:
+    """
+    Used for https://arxiv.org/pdf/1904.10030.pdf,
+    implementation from https://github.com/JunMa11/SegWithDistMap
+    """
+    # Relasx the assertion to allow computation live on only a
+    # subset of the classes
+    # assert one_hot(torch.tensor(seg), axis=0)
+    K: int = len(seg)
+
+    res = np.zeros_like(seg, dtype=dtype)
+    for k in range(K):
+        posmask = seg[k].astype(np.bool)
+
+        if posmask.any():
+            res[k] = eucl_distance(posmask, sampling=resolution)
+
+    return res
+
+def probs2one_hot(probs: Tensor) -> Tensor:
+    _, K, *_ = probs.shape
+    assert simplex(probs)
+
+    res = class2one_hot(probs2class(probs), K)
+    assert res.shape == probs.shape
+    assert one_hot(res)
+
+    return res
+
+def test_fn():
+    print('This is a test function')

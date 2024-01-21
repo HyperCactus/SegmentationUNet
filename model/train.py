@@ -11,6 +11,7 @@ from modules import ImprovedUNet
 from dataset import VAL_LOADER, TRAIN_LOADER, create_loader, augment_image # TRAIN_TRANSFORMS
 import time
 from utils import *
+from glob import glob
 from torch.utils.tensorboard import SummaryWriter
 from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold
 from global_params import * # Hyperparameters and other global variables
@@ -105,7 +106,8 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         # update tqdm loop
         loop.set_postfix(loss=loss.item(), var=var)
 
-def train():    
+def train():
+    begin_time = time.time()  
     # 3 channels in for RGB images, 1 channel out for binary mask
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device)
     
@@ -117,8 +119,8 @@ def train():
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus
-    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True, factor=0.1)
-    scheduler = ReduceLROnThreshold(optimizer, threshold=0.02, mode='above', verbose=True, factor=0.1)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=2, verbose=True, factor=0.1)
+    # scheduler = ReduceLROnThreshold(optimizer, threshold=0.02, mode='above', verbose=True, factor=0.1)
     
     # load model if LOAD_MODEL is True
     if LOAD_MODEL:
@@ -153,12 +155,18 @@ def train():
         losses.extend(train_epoch_losses)
         
         # Update the learning rate
-        # scheduler.step(epoch_losses[-1])
-        scheduler.step(epoch_variances[-1])
+        scheduler.step(epoch_losses[-1])
+        # scheduler.step(epoch_variances[-1])
         
         # Calculate the validation dice score after each epoch
         # val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)
-        val_dice_score = surface_dice(model, device=device, dataset_folder=VAL_DATASET_DIR)
+        # select a random subvolume from the validation dataset
+        n_images = len(glob(os.path.join(VAL_IMG_DIR, '*.tif')))
+        subvol_depth = 100
+        subvol_start = np.random.randint(0, n_images-subvol_depth)
+        sub_data_idxs = (subvol_start, subvol_start+subvol_depth)
+        
+        val_dice_score = surface_dice(model, device=device, dataset_folder=VAL_DATASET_DIR, sub_data_idxs=sub_data_idxs)
         val_dice_score = np.round(val_dice_score, 4)
         dice_scores.append(val_dice_score)
         print(f'Validation dice score: {val_dice_score}')
@@ -236,7 +244,11 @@ def train():
     if not HPC:
         plt.show()
 
-    print('TRAIN COMPLETE')
+    finish_time = time.time()
+    # convert time to hours, minutes, seconds
+    h, rem = divmod(finish_time-begin_time, 3600)
+    m, s = divmod(rem, 60)
+    print(f'TRAIN COMPLETE IN {h:.0f}h {m:.0f}m {s:.0f}s')
 
 if __name__ == '__main__':
     train()
