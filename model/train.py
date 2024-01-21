@@ -159,7 +159,7 @@ def train():
         # Calculate the validation dice score after each epoch
         # val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)
         val_dice_score = surface_dice(model, device=device, dataset_folder=VAL_DATASET_DIR)
-        val_dice_score = np.round(val_dice_score.item(), 4)
+        val_dice_score = np.round(val_dice_score, 4)
         dice_scores.append(val_dice_score)
         print(f'Validation dice score: {val_dice_score}')
         print(f'Average epoch loss: {average_loss:.4f}')
