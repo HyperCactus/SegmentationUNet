@@ -406,7 +406,7 @@ def create_test_loader(image_files, batch_size,
     dataset = UsageDataset(image_files, augmentation_transforms=augmentations)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform, shuffle=False)
+VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform, shuffle=True)
 
 # kidney_1_voi_loader = create_loader(os.path.join(BASE_PATH, 'kidney_1_voi', 'images'), 
 #                                      os.path.join(BASE_PATH, 'kidney_1_voi', 'labels'), 
