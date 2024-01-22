@@ -252,7 +252,8 @@ from global_params import *
 class CustomDataset(Dataset):
     def __init__(self, images_path, masks_path, 
                  augmentation_transforms=None,
-                 img_file_ext='tif', mask_file_ext='tif'):
+                 img_file_ext=IMG_FILE_EXT, mask_file_ext=MASK_FILE_EXT):
+        
         images_path = [images_path] if isinstance(images_path, str) else images_path
         masks_path = [masks_path] if isinstance(masks_path, str) else masks_path
         assert len(images_path) == len(masks_path), \
@@ -352,9 +353,9 @@ def augment_image(image, mask):
     transform = A.Compose([
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
-        A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=15, shift_limit=0.1, p=0.8, border_mode=0),
-        A.Affine(shear=(-10, 10), p=0.5), # Untested addition
-        A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
+        A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=180, shift_limit=0.1, p=0.8, border_mode=0),
+        A.Affine(shear=(-10, 10), p=0.5), # Untested addition (shear transform)
+        A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.1, 0.1), contrast_limit=(-0.2, 0.2)),
         A.OneOf(
             [
                 A.Blur(blur_limit=3, p=0.9),
@@ -362,9 +363,9 @@ def augment_image(image, mask):
             ],
             p=0.7,
         ),
-        A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, always_apply=True),
+        A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, p=0.9),
         A.Resize(IMAGE_HEIGHT, IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
-        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+        # A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
     ])
 
     augmented = transform(image=image_np, mask=mask_np)
@@ -405,7 +406,7 @@ def create_test_loader(image_files, batch_size,
     dataset = UsageDataset(image_files, augmentation_transforms=augmentations)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform)
+VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform, shuffle=False)
 
 # kidney_1_voi_loader = create_loader(os.path.join(BASE_PATH, 'kidney_1_voi', 'images'), 
 #                                      os.path.join(BASE_PATH, 'kidney_1_voi', 'labels'), 
@@ -420,7 +421,7 @@ TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE,
                             transform=augment_image, shuffle=True)
 
 
-test_mode = False
+test_mode = True
 # print(len(kidney_1_voi_loader))
 
 if test_mode:
@@ -436,7 +437,8 @@ if test_mode:
         print("Mask batch shape:", batch_masks.shape)
         
         for image, mask in zip(batch_images, batch_masks):
-        
+            noise = torch.randn_like(image) * NOISE_MULTIPLIER
+            image = image + noise
             image = image.permute((1, 2, 0)).numpy()*255.0;
             print(f'image.shape: {image.shape}')
             # image = image.squeeze(0).numpy()*255.0

@@ -50,10 +50,10 @@ def create_test_loader(image_files, batch_size,
     dataset = UsageDataset(image_files, augmentation_transforms=augmentations)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub_data_idxs=None):
+def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub_data_idxs=None, verbose=False):
     
-    ls_images = glob(os.path.join(dataset_folder, "images", "*.tif"))
-    ls_masks = glob(os.path.join(dataset_folder, 'labels', "*.tif"))
+    ls_images = glob(os.path.join(dataset_folder, "images", "*"+IMG_FILE_EXT))
+    ls_masks = glob(os.path.join(dataset_folder, 'labels', "*"+MASK_FILE_EXT))
     if sub_data_idxs:
         ls_images = ls_images[sub_data_idxs[0]:sub_data_idxs[1]]
         ls_masks = ls_masks[sub_data_idxs[0]:sub_data_idxs[1]]
@@ -66,11 +66,10 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
     true_masks = torch.zeros((len(ls_images), h, w))
     
     surface_dice_scores = []
-    pbar = tqdm(enumerate(test_loader), total=len(test_loader), desc='Inference ')
+    pbar = tqdm(enumerate(test_loader), total=len(test_loader), desc='Validating ')
     for batch_idx, (images, shapes) in pbar:
         shapes = np.array(shapes)
         images = images.to(device, dtype=torch.float)
-        
         
         orig_shape = images.shape[2:]
         
@@ -94,7 +93,8 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
                 tile_preds = [model(tile) for tile in tiles]
                 
             tta_preds = recombine_tiles(tile_preds, orig_shape, TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
-            preds += torch.flip(tta_fn(tta_preds), dims=[3])
+            # preds += torch.flip(tta_fn(tta_preds), dims=[3])
+            preds += tta_fn(tta_preds)
                 
         preds /= len(tta_lambdas)
 
@@ -113,14 +113,14 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
             
             # pred = remove_small_objects(pred, 5)
 
-            if batch_idx == 0 and i == 0:
+            if verbose and batch_idx == 0 and i == 0:
                 print(f'pred shape: {pred.shape}, true_mask shape: {true_mask.shape}')
                 # plot an example
                 # pred = pred[0]
                 print(f'Prediction shape: {pred.shape}')
                 plt.figure(figsize=(10, 10))
                 plt.subplot(1, 2, 1)
-                plt.imshow(images[0].cpu().permute(1, 2, 0))
+                plt.imshow(images[0].cpu().permute(1, 2, 0), cmap='gray')
                 plt.title('image')
                 plt.subplot(1, 2, 2)
                 plt.imshow(pred)
@@ -164,6 +164,8 @@ def main():
 
     print(f'Surface Dice Score: {surface_dice_score:.4f}')
     
+    plot_examples(model, sub_data_idxs=(500, 1400))
+    
     # view_examples('saved_images/kidney_1_voi')
     
     # # calculate the dice score on the test set
@@ -174,12 +176,12 @@ def main():
     # print(f'Validation Dice Score: {dice_score:.4f}')
     # # print(f'Validation IoU Score: {iou_score:.4f}')
 
-    VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform, shuffle=True)
+    # VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform, shuffle=True)
     
-    save_predictions_as_imgs(VAL_LOADER, model, num=30, 
-                             folder='saved_images/', device=device)
+    # save_predictions_as_imgs(VAL_LOADER, model, num=30, 
+    #                          folder='saved_images/', device=device)
 
-    plot_samples(6, title='Predictions', include_image=True)
+    # plot_samples(6, title='Predictions', include_image=True)
 
 if __name__ == '__main__':
     main()

@@ -15,7 +15,7 @@ from glob import glob
 from torch.utils.tensorboard import SummaryWriter
 from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold
 from global_params import * # Hyperparameters and other global variables
-from evaluate import local_surface_dice as surface_dice
+from evaluate import local_surface_dice as validate
 
 # RANGPUR Settings 
 from evaluate import main as evaluate_fn
@@ -59,8 +59,9 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
     for batch_idx, (data, targets) in enumerate(loop):
         data = data.to(device=device)
         targets = targets.float().unsqueeze(1).to(device=device)
-        # targets = targets.float().to(device=device)
-        # targets = targets.unsqueeze(1)
+        
+        noise = torch.randn_like(data) * NOISE_MULTIPLIER
+        data += noise
         # forward
         with torch.cuda.amp.autocast():# and torch.autograd.detect_anomaly():
             predictions = model(data)
@@ -81,7 +82,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         # backward
         optimizer.zero_grad()
 
-        if check_memory and batch_idx == 0:
+        if check_memory and batch_idx == 2:
             t = torch.cuda.get_device_properties(0).total_memory / 1024**3
             a = torch.cuda.memory_allocated(0) / 1024**3
             print(f'MEMORY USAGE: {a:.2f}GB out of {t:.2f}GB ({a/t*100:.2f}%)')
@@ -158,15 +159,19 @@ def train():
         scheduler.step(epoch_losses[-1])
         # scheduler.step(epoch_variances[-1])
         
+        plot_examples(model, num=5, device=device, 
+                      dataset_folder=VAL_DATASET_DIR, 
+                      sub_data_idxs=(500, 1400), save=True,
+                      save_dir=f'saved_images/epoch_{epoch}_examples.png', show=False)
+        
         # Calculate the validation dice score after each epoch
         # val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)
         # select a random subvolume from the validation dataset
-        n_images = len(glob(os.path.join(VAL_IMG_DIR, '*.tif')))
+        n_images = len(glob(os.path.join(VAL_IMG_DIR, '*'+IMG_FILE_EXT)))
         subvol_depth = 100
         subvol_start = np.random.randint(0, n_images-subvol_depth)
         sub_data_idxs = (subvol_start, subvol_start+subvol_depth)
-        
-        val_dice_score = surface_dice(model, device=device, dataset_folder=VAL_DATASET_DIR, sub_data_idxs=sub_data_idxs)
+        val_dice_score = validate(model, device=device, dataset_folder=VAL_DATASET_DIR, sub_data_idxs=sub_data_idxs)
         val_dice_score = np.round(val_dice_score, 4)
         dice_scores.append(val_dice_score)
         print(f'Validation dice score: {val_dice_score}')

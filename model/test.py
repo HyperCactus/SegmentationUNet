@@ -1,43 +1,19 @@
-# import torch
-
-# print('Begin testing')
-# print('torch version: ', torch.__version__)
-# # testing cuda
-# if torch.cuda.is_available():
-#     print('cuda is available')
-# else:
-#     print('cuda is NOT available')
-
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# x = torch.zeros(1)
-# print(f'x on cpu: {x}')
-# x = x.to(device)
-# print(f'x on {device}: {x}')
-
-# print('Success')
-
-# from surface_dice import score
-# from utils import *
-# from global_params import *
-
-# kidney_5_path = 'data_downsampled512/test/kidney_5'
-# kidney_6_path = 'data_downsampled512/test/kidney_6'
-
-from PIL import Image
-import numpy as np
+import torch
 import matplotlib.pyplot as plt
+import numpy as np
 import cv2
+import os
+from modules import ImprovedUNet
+from glob import glob
+from utils import inference_fn, load_checkpoint, plot_examples
+from dataset import preprocess_image, preprocess_mask
+from global_params import *
+        
+        
+if __name__ == '__main__':
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
+    load_checkpoint(torch.load(CHECKPOINT_DIR), model)
 
-# image = Image.open('data/train/kidney_1_voi/images/0024.tif').convert('L')
-# image.show()
-# image = np.array(image, dtype=np.float32)
-# plt.imshow(image, cmap='gray')
-# plt.show()
-# print(f'Image shape: {image.shape}')
-# print(f'Min value: {np.min(image)}')
-# print(image)
-
-image = cv2.imread('data/train/kidney_1_voi/images/0024.tif', cv2.IMREAD_GRAYSCALE)
-plt.imshow(image, cmap='gray')
-plt.show()
-print(f'Image shape: {image.shape}')
+    plot_examples(model, num=5, device='cpu', dataset_folder=VAL_DATASET_DIR, sub_data_idxs=(500, 1400))

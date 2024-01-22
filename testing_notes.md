@@ -110,3 +110,5 @@ p100
 kaleen
 a100
 a100-test*
+
+* test with/without noise, 3 vs 1 in_chans, ..., png data on rangpur 

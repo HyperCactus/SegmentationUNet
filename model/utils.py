@@ -23,7 +23,8 @@ import torch
 import torch.nn as nn
 # from costom_loss import IoULoss
 from global_params import *
-from dataset import create_loader#, val_transform
+from dataset import create_loader, preprocess_image, preprocess_mask
+from glob import glob
 from torch import Tensor, einsum
 from typing import Any, Callable, Iterable, List, Set, Tuple, TypeVar, Union, cast
 from scipy.ndimage import distance_transform_edt as eucl_distance
@@ -803,3 +804,102 @@ def probs2one_hot(probs: Tensor) -> Tensor:
 
 def test_fn():
     print('This is a test function')
+
+
+def inference_fn(model, img:torch.Tensor, 
+                 tta_lambdas='flips', device='cuda',
+                 tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y, tile_size=TILE_SIZE,
+                 noise_amount=0, pred_threshold=PREDICTION_THRESHOLD):
+    # add noise to the image
+    noise = torch.randn_like(img) * noise_amount
+    img = img + noise
+    
+    img = img.to(device)
+    model = model.to(device)
+    
+    b, c, h, w = img.shape
+    
+    preds = torch.zeros((b, 1, h, w), dtype=torch.float32, device=device)
+    
+    if tta_lambdas == 'flips':
+        tta_lambdas = [lambda x: x, 
+                       lambda x: torch.flip(x, dims=[3]),
+                       lambda x: torch.flip(x, dims=[2]), 
+                       lambda x: torch.flip(torch.flip(x, dims=[2]), dims=[3])]
+    else:
+        assert type(tta_lambdas[0]) == type(lambda x: x), 'tta_lambdas must be a list of functions'
+        tta_lambdas = tta_lambdas
+    
+    for tta_fn in tta_lambdas:
+        tta_img = tta_fn(img)
+        tiles = batch_tiling_split(tta_img, tile_size, tiles_in_x=tiles_in_x, tiles_in_y=tiles_in_y)
+        
+        model.eval()
+        with torch.no_grad():
+            tile_preds = [model(tile) for tile in tiles]
+            
+        tta_preds = recombine_tiles(tile_preds, (h, w), TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+        preds += tta_fn(tta_preds)
+            
+    preds /= len(tta_lambdas)
+
+    preds = (nn.Sigmoid()(preds)>pred_threshold).double()
+    preds = preds.cpu().numpy().astype(np.uint8)
+    return preds
+
+
+def plot_examples(model, num=5, device='cuda', 
+                  dataset_folder=VAL_DATASET_DIR, sub_data_idxs=None,
+                  save=False, save_dir=None, show=True):
+    
+    _img_path = os.path.join(dataset_folder, 'images', "*"+IMG_FILE_EXT)
+    img_paths = glob(os.path.join(dataset_folder, 'images', "*"+IMG_FILE_EXT))
+    mask_paths = glob(os.path.join(dataset_folder, 'labels', "*"+MASK_FILE_EXT))
+
+    if sub_data_idxs is not None:
+        start, end = sub_data_idxs
+        img_paths = img_paths[start:end]
+        mask_paths = mask_paths[start:end]
+    
+    # print(f'Looking in {_img_path} found {len(img_paths)} images')
+    # choose n random images
+    rand_idxs = np.random.choice(len(img_paths), num, replace=False)
+
+    h, w, c = cv2.imread(img_paths[0]).shape
+
+    plt.figure(figsize=(3*w/600, num*h/600))
+    subplot_idx = 1
+    for i, idx in enumerate(rand_idxs):
+        img_path = img_paths[idx]
+        mask_path = mask_paths[idx]
+        
+        img = preprocess_image(img_path)
+        msk = preprocess_mask(mask_path)
+        
+        pred = inference_fn(model, img.unsqueeze(0).to(device))
+        
+        if c > 1:
+            img = img[0] # only plot one channel
+        
+        plt.subplot(num, 3, subplot_idx)
+        plt.imshow(img.squeeze(), cmap='gray')
+        plt.axis('off')
+        plt.title('Original Image') if i == 0 else None # only add title to first row
+        plt.subplot(num, 3, subplot_idx+1)
+        plt.imshow(msk.squeeze(), cmap='gray')
+        plt.axis('off')
+        plt.title('Ground Truth') if i == 0 else None
+        plt.subplot(num, 3, subplot_idx+2)
+        plt.imshow(pred.squeeze(), cmap='gray')
+        plt.axis('off')
+        plt.title('Prediction') if i == 0 else None
+        subplot_idx += 3
+    
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.9) # add some space at the top of the figure for the title
+    
+    if save:
+        save_dir = save_dir if save_dir is not None else 'saved_images/plot_examples.png'
+        plt.savefig(save_dir)
+    if show:
+        plt.show()
