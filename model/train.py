@@ -82,7 +82,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         # backward
         optimizer.zero_grad()
 
-        if check_memory and batch_idx == 2:
+        if check_memory and batch_idx == 10:
             t = torch.cuda.get_device_properties(0).total_memory / 1024**3
             a = torch.cuda.memory_allocated(0) / 1024**3
             print(f'MEMORY USAGE: {a:.2f}GB out of {t:.2f}GB ({a/t*100:.2f}%)')
@@ -112,10 +112,10 @@ def train():
     # 3 channels in for RGB images, 1 channel out for binary mask
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device)
     
-    # loss_fn = torch.nn.BCEWithLogitsLoss()
+    loss_fn = torch.nn.BCEWithLogitsLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
     # loss_fn = EpicLoss(cross_entropy_weight=1, iou_weight=0) # Custom loss
-    loss_fn = IoULoss() # Testing this loss function
+    # loss_fn = IoULoss() # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
