@@ -114,8 +114,8 @@ def train():
     
     # loss_fn = torch.nn.BCEWithLogitsLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
-    loss_fn = EpicLoss(cross_entropy_weight=1, iou_weight=0) # Custom loss
-    # loss_fn = IoULoss() # Testing this loss function
+    # loss_fn = EpicLoss(cross_entropy_weight=1, iou_weight=0) # Custom loss
+    loss_fn = IoULoss() # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
@@ -162,7 +162,7 @@ def train():
         plot_examples(model, num=5, device=device, 
                       dataset_folder=VAL_DATASET_DIR, 
                       sub_data_idxs=(500, 1400), save=True,
-                      save_dir=f'saved_images/epoch_{epoch}_examples.png', show=False)
+                      save_dir=f'saved_images/epoch_{epoch+1}_examples.png', show=False)
         
         # Calculate the validation dice score after each epoch
         # val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)

@@ -2,8 +2,8 @@
 #### This is my entry to the [SenNet + HOA - Hacking the Human Vasculature in 3D](https://www.kaggle.com/competitions/blood-vessel-segmentation) Competition on Kaggle
 
 ## Files:
-`train.py` - script for training the model
-`evaluate.py` - script for evaluating model
+`train.py` - script for training the model \\
+`evaluate.py` - script for evaluating model \\
 `utils.py` - helper functions
 
 
@@ -12,14 +12,14 @@ The goal of this project is to automatically segment the blood vessels from high
 
 Example:
 
-![figure 1: example output](_readme_ims/tiled_example1.png)
+![figure 1: example output](_readme_ims/tiled_example1.png) \\
 
+![figure 2: randomized examples from validation set](_readme_ims/randomized_val_examples2.png)
 
 ## Data:
 The data for 
 
-Animation:
-
+Animation: \\
 ![figure 2: animation of kidney data](_readme_ims/animation.gif)
 
 ### Data pre-processing:
@@ -29,5 +29,5 @@ Images are broken into 512x512 tiles that are uniformly distributed over the ima
 
 ## Model:
 
-## Refferences:
+## References:
 1. Yashvardhan Jain, Katy Borner, Claire Walsh, Nancy Ruschman, Peter D. Lee, Griffin M. Weber, Ryan Holbrook, Addison Howard. (2023). SenNet + HOA - Hacking the Human Vasculature in 3D. Kaggle. https://kaggle.com/competitions/blood-vessel-segmentation

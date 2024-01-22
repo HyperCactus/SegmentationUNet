@@ -10,28 +10,6 @@ from typing import List, cast
 import numpy as np
 from utils import one_hot2hd_dist, probs2one_hot, simplex, one_hot
 
-class IslandLoss(nn.Module):
-    """
-    A loss function that penalizes the model for predicting more or fewer 
-    islands of pixels then are present in the mask.
-    """
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-    
-    def forward(self, prediction, targets, smooth=1):
-        
-        # an island is a group of white pixels, (pixels with value of 1) that are connected
-        # islands are separated by black pixels (pixels with value of 0)
-        # we will need to use a clever algorithm to find the number of islands in the mask
-        pass
-        
-
-def calc_islands(mask):
-    """
-    Calculates the number of islands in the mask
-    """
-    pass
-
 
 # Intersection over Union (IoU) loss
 class IoULoss(nn.Module):

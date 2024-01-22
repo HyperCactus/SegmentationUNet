@@ -421,7 +421,7 @@ TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE,
                             transform=augment_image, shuffle=True)
 
 
-test_mode = True
+test_mode = False#True
 # print(len(kidney_1_voi_loader))
 
 if test_mode:
