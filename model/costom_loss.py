@@ -134,7 +134,7 @@ class BinaryDiceLoss(nn.Module):
         elif self.reduction == 'none':
             return loss
         else:
-            raise Exception('Unexpected reduction {}'.format(self.reduction))
+            raise Exception(f'Unexpected reduction {self.reduction}')
 
 ###############################################################################
 # following from: https://github.com/sunfan-bvb/BoundaryDoULoss/blob/main/TransUNet/utils.py

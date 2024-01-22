@@ -262,8 +262,8 @@ class CustomDataset(Dataset):
         image_files = []
         mask_files = []
         for image_dir, mask_dir in zip(images_path, masks_path):
-            image_files += glob(os.path.join(image_dir, f'*{img_file_ext}'))
-            mask_files += glob(os.path.join(mask_dir, f'*{mask_file_ext}'))
+            image_files += sorted(glob(os.path.join(image_dir, f'*{img_file_ext}')))
+            mask_files += sorted(glob(os.path.join(mask_dir, f'*{mask_file_ext}')))
         self.image_files = image_files
         self.mask_files = mask_files
         self.augmentation_transforms = augmentation_transforms

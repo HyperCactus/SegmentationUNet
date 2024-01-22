@@ -13,7 +13,7 @@ import time
 from utils import *
 from glob import glob
 from torch.utils.tensorboard import SummaryWriter
-from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold
+from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold, BinaryDiceLoss
 from global_params import * # Hyperparameters and other global variables
 from evaluate import local_surface_dice as validate
 
@@ -112,7 +112,8 @@ def train():
     # 3 channels in for RGB images, 1 channel out for binary mask
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device)
     
-    loss_fn = torch.nn.BCEWithLogitsLoss()
+    # loss_fn = torch.nn.BCEWithLogitsLoss()
+    loss_fn = BinaryDiceLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
     # loss_fn = EpicLoss(cross_entropy_weight=1, iou_weight=0) # Custom loss
     # loss_fn = IoULoss() # Testing this loss function

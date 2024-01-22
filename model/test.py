@@ -11,6 +11,7 @@ from global_params import *
         
         
 if __name__ == '__main__':
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)

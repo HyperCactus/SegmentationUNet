@@ -853,8 +853,8 @@ def plot_examples(model, num=5, device='cuda',
                   save=False, save_dir=None, show=True):
     
     _img_path = os.path.join(dataset_folder, 'images', "*"+IMG_FILE_EXT)
-    img_paths = glob(os.path.join(dataset_folder, 'images', "*"+IMG_FILE_EXT))
-    mask_paths = glob(os.path.join(dataset_folder, 'labels', "*"+MASK_FILE_EXT))
+    img_paths = sorted(glob(os.path.join(dataset_folder, 'images', "*"+IMG_FILE_EXT)))
+    mask_paths = sorted(glob(os.path.join(dataset_folder, 'labels', "*"+MASK_FILE_EXT)))
     
     assert len(img_paths) == len(mask_paths), 'Number of images and masks must be equal'
 
