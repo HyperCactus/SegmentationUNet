@@ -321,10 +321,12 @@ def preprocess_image(path, return_size=False):
         img = np.tile(img[...,None],[1, 1, 3]) 
     img = img.astype('float32') 
 
-    # scaling to 0-1
+    # normalize and mean center the image
     mx = np.max(img)
     if mx:
         img/=mx
+        mean = np.mean(img)
+        img -= mean
 
     orig_size = img.shape
     

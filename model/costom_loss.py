@@ -9,14 +9,16 @@ from torch.optim.lr_scheduler import _LRScheduler
 from typing import List, cast
 import numpy as np
 from utils import one_hot2hd_dist, probs2one_hot, simplex, one_hot
+from global_params import PREDICTION_THRESHOLD
 
 
 # Intersection over Union (IoU) loss
 class IoULoss(nn.Module):
-    def __init__(self, weight=None, size_average=True, eps=1e-7):
+    def __init__(self, weight=None, size_average=True, smooth=1):
         super(IoULoss, self).__init__()
+        self.smooth = smooth
 
-    def forward(self, prediction, targets, smooth=1):
+    def forward(self, prediction, targets):
         # comment out if your model contains a sigmoid or equivalent activation layer
         inputs = torch.sigmoid(prediction)       
         
@@ -30,7 +32,7 @@ class IoULoss(nn.Module):
         total = (inputs + targets).sum()
         union = total - intersection 
         
-        IoU = (intersection + smooth)/(union + smooth)  # smooth is added to avoid divide by zero error
+        IoU = (intersection + self.smooth)/(union + self.smooth)  # smooth is added to avoid divide by zero error
         
         return 1 - IoU
 
@@ -40,7 +42,7 @@ class IoULoss(nn.Module):
 class BlackToWhiteRatioLoss(nn.Module):
     """Loss based on the ratio of black pixels to white pixels in the mask"""
     
-    def __init__(self, weight=None, avtivation_threshold=0.5,
+    def __init__(self, weight=None, avtivation_threshold=PREDICTION_THRESHOLD,
                  size_average=True, eps=1e-7):
         """Initialize the loss function"""
         
@@ -51,46 +53,13 @@ class BlackToWhiteRatioLoss(nn.Module):
     def forward(self, predictions, targets, smooth=1):
         """Forward pass of the loss function"""
         assert predictions.shape[0] == targets.shape[0], "predict & target batch size don't match"
-        inputs = predictions.contiguous().view(predictions.shape[0], -1)
-        targets = targets.contiguous().view(targets.shape[0], -1)
         
-        # comment out if your model contains a sigmoid or equivalent activation layer
-        # inputs = torch.sigmoid(predictions)       
-        
-        # flatten label and prediction tensors
-        # inputs = inputs.view(-1)
-        # targets = targets.view(-1)
-        
-        # calculate the ratio of black pixels to white pixels
-        # black_pixels_pred = (inputs < self.threshold).sum()
-        # white_pixels_pred = (inputs >= self.threshold).sum()
-        # ratio_pred = black_pixels_pred / white_pixels_pred
-        
-        # black_pixels_mask = (targets == 0).sum()
-        # white_pixels_mask = (targets == 1).sum()
-        # ratio_mask = black_pixels_mask / white_pixels_mask
-        
-        # loss = torch.abs(ratio_pred - ratio_mask)\
-        
-        # print('Pass 1')
-        # predicted = torch.Tensor((inputs < self.threshold).sum().sum())
-        # print('Pass 2')
-        # target = torch.Tensor(targets.sum().sum())
-        # print('Pass 3')
-        # # loss = nn.MSELoss(predicted, target)
-        # loss = F.mse_loss(predicted, target)
-        # print(f'loss: {loss}, type: {type(loss)}')
-        
-        # calculate the number of ones (white pixels) in the mask
-        ones_in_mask = torch.sum(targets)
-        
-        # calculate the number of elements in the prediction that are greater than the threshold
-        # ones_in_pred = (inputs > self.threshold).sum()
-        mask = inputs > self.threshold
-        ones = torch.ones_like(inputs)
-        ones_in_pred = torch.sum(ones[mask])
-        
-        loss = torch.abs(1 - (ones_in_pred / ones_in_mask))
+        predictions = F.sigmoid(predictions)
+        # intersection = (predictions * targets).sum()
+        # loss = 1 - intersection
+        th_preds = predictions > self.threshold
+        sum_ratio = predictions.sum() / targets.sum()
+        loss = torch.abs(sum_ratio - 1)
         
         return loss
 
@@ -178,7 +147,8 @@ class BoundaryDoULoss(nn.Module):
         return loss
 
     def forward(self, inputs, target):
-        inputs = torch.softmax(inputs, dim=1)
+        # inputs = torch.softmax(inputs, dim=1)
+        inputs = F.sigmoid(inputs)
         target = target.squeeze(1)
         target = self._one_hot_encoder(target)
 

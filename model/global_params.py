@@ -4,16 +4,17 @@ Global parameters for the UNet model defined here for easy access across files.
 
 HPC = True
 PNG_DSET = True
+TEST_MODE = not HPC
 
 # Hyperparameters
 # LEARNING_RATE = 1e-4
 LEARNING_RATE = 1e-4
 BATCH_SIZE = 8 if HPC else 4
 # BATCH_SIZE = 3 # Laptop
-NUM_EPOCHS = 4 if HPC else 1
+NUM_EPOCHS = 15 if HPC else 300
 NUM_WORKERS = 4
 PIN_MEMORY = True
-PREDICTION_THRESHOLD = 0.9#0.5
+PREDICTION_THRESHOLD = 0.5#0.5
 IN_CHANNELS = 1 # I've stacked the previous image, current image, and next image as the input channels
 
 IMAGE_HEIGHT = 512
@@ -41,7 +42,7 @@ VAL_MASK_DIR = VAL_DATASET_DIR + '/labels'
 IMG_FILE_EXT = '.png' if PNG_DSET else '.tif'
 MASK_FILE_EXT = '.png' if PNG_DSET else '.tif'
 
-NOISE_MULTIPLIER = 0.03
+NOISE_MULTIPLIER = 0.002
 
 
 # base_path = 'data_downsampled512/train'

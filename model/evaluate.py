@@ -66,14 +66,14 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
     true_masks = torch.zeros((len(ls_images), h, w))
     
     surface_dice_scores = []
-    pbar = tqdm(enumerate(test_loader), total=len(test_loader), desc='Validating ')
+    pbar = tqdm(enumerate(test_loader), total=len(test_loader), desc='Validating ') if verbose else enumerate(test_loader)
     for batch_idx, (images, shapes) in pbar:
         shapes = np.array(shapes)
         images = images.to(device, dtype=torch.float)
         
         orig_shape = images.shape[2:]
         
-        if batch_idx == 0:
+        if batch_idx == 0 and verbose:
             print(f'Original shape: {orig_shape}')
         
         # TTA

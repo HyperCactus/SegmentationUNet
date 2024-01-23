@@ -24,7 +24,7 @@ class ContextModule(nn.Module):
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
         self.norm1 = nn.InstanceNorm2d(out_channels)
         self.relu1 = nn.LeakyReLU(negative_slope=1e-2)
-        self.dropout = nn.Dropout2d(p=0.3)
+        self.dropout = nn.Dropout2d(p=0.0)
         self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
         self.norm2 = nn.InstanceNorm2d(out_channels)
         self.relu2 = nn.LeakyReLU(negative_slope=1e-2)

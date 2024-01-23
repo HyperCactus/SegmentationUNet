@@ -363,9 +363,9 @@ def print_progress(start_time, epoch, num_epochs):
     remaining_time %= 3600
     minutes = remaining_time // 60
     remaining_time %= 60
-    print(f"""Epoch [{epoch+1}/{num_epochs}] completed. Time elapsed: {elapsed_time}. 
-          seconds. Time remaining: {days:.0f} days, {hours:.0f} hours, 
-          {minutes:.0f} minutes.""")
+    print(f"""Epoch [{epoch+1}/{num_epochs}] completed. Time elapsed: {elapsed_time}. \
+seconds. Time remaining: {days:.0f} days, {hours:.0f} hours, \
+{minutes:.0f} minutes.""", end='\r')
 
 
 
@@ -905,3 +905,35 @@ def plot_examples(model, num=5, device='cuda',
         plt.savefig(save_dir)
     if show:
         plt.show()
+    else:
+        plt.close()
+
+def show_image_pred(img, pred, mask=None, 
+                    figsize=(10, 6),
+                    title='Image, Prediction, Mask',
+                    save=False, save_dir=None, show=True):
+    """
+    Plots the original image, the prediction and the mask side by side
+    """
+    fig, axs = plt.subplots(1, 3, figsize=figsize)
+    axs[0].imshow(img[0], cmap='gray')
+    axs[0].set_title('Original Image')
+    axs[0].axis('off')
+    axs[1].imshow(pred.squeeze(), cmap='gray')
+    axs[1].set_title('Prediction')
+    axs[1].axis('off')
+    if mask is not None:
+        axs[2].imshow(mask.squeeze(), cmap='gray')
+        axs[2].set_title('Mask')
+        axs[2].axis('off')
+    plt.suptitle(title)
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.9) # add some space at the top of the figure for the title
+    
+    if save:
+        save_dir = save_dir if save_dir is not None else 'saved_images/plot_examples.png'
+        plt.savefig(save_dir)
+    if show:
+        plt.show()
+    else:
+        plt.close()
