@@ -252,7 +252,7 @@ from global_params import *
 class CustomDataset(Dataset):
     def __init__(self, images_path, masks_path, 
                  augmentation_transforms=None,
-                 img_file_ext=IMG_FILE_EXT, mask_file_ext=MASK_FILE_EXT):
+                 img_file_ext=IMG_FILE_EXT, mask_file_ext=MASK_FILE_EXT, sub_data_idxs=None):
         
         images_path = [images_path] if isinstance(images_path, str) else images_path
         masks_path = [masks_path] if isinstance(masks_path, str) else masks_path
@@ -264,6 +264,12 @@ class CustomDataset(Dataset):
         for image_dir, mask_dir in zip(images_path, masks_path):
             image_files += sorted(glob(os.path.join(image_dir, f'*{img_file_ext}')))
             mask_files += sorted(glob(os.path.join(mask_dir, f'*{mask_file_ext}')))
+        if sub_data_idxs is not None:
+            start = sub_data_idxs[0]
+            end = sub_data_idxs[1]
+            image_files = image_files[start:end]
+            mask_files = mask_files[start:end]
+        
         self.image_files = image_files
         self.mask_files = mask_files
         self.augmentation_transforms = augmentation_transforms
@@ -397,9 +403,9 @@ def val_transform(image, mask):
     return augmented_image, augmented_mask
 
 def create_loader(image_files, mask_files, batch_size, 
-                  transform=None, shuffle=False):
+                  transform=None, shuffle=False, sub_data_idxs=None):
     
-    dataset = CustomDataset(image_files, mask_files, augmentation_transforms=transform)
+    dataset = CustomDataset(image_files, mask_files, augmentation_transforms=transform, sub_data_idxs=sub_data_idxs)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
 def create_test_loader(image_files, batch_size, 
@@ -408,7 +414,7 @@ def create_test_loader(image_files, batch_size,
     dataset = UsageDataset(image_files, augmentation_transforms=augmentations)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform, shuffle=True)
+VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=None, shuffle=False)
 
 # kidney_1_voi_loader = create_loader(os.path.join(BASE_PATH, 'kidney_1_voi', 'images'), 
 #                                      os.path.join(BASE_PATH, 'kidney_1_voi', 'labels'), 

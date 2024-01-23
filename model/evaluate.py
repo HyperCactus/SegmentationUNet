@@ -3,7 +3,7 @@ Loads the model and runs it on the test set. Saves the predictions to a folder f
 and calculates the dice score on the test set.
 """
 
-from dataset import UsageDataset, VAL_LOADER, val_transform
+from dataset import UsageDataset, VAL_LOADER, val_transform, create_loader
 import torch
 from utils import *
 from modules import ImprovedUNet
@@ -57,7 +57,9 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
     if sub_data_idxs:
         ls_images = ls_images[sub_data_idxs[0]:sub_data_idxs[1]]
         ls_masks = ls_masks[sub_data_idxs[0]:sub_data_idxs[1]]
-    test_loader = create_test_loader(ls_images, BATCH_SIZE, augmentations=test_transform)
+    
+    test_loader = create_test_loader(ls_images, BATCH_SIZE, augmentations=None)
+    val_loader = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=None, shuffle=False, sub_data_idxs=sub_data_idxs)
 
     # create a 3d tensor of zeros to store the predictions for the whole kidney for 3D surface dice score
     # also need a 3d tensor of zeros for the true mask
@@ -66,9 +68,8 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
     true_masks = torch.zeros((len(ls_images), h, w))
     
     surface_dice_scores = []
-    pbar = tqdm(enumerate(test_loader), total=len(test_loader), desc='Validating ') if verbose else enumerate(test_loader)
-    for batch_idx, (images, shapes) in pbar:
-        shapes = np.array(shapes)
+    pbar = tqdm(enumerate(val_loader), total=len(val_loader), desc='Validating ') if verbose else enumerate(val_loader)
+    for batch_idx, (images, masks) in pbar:
         images = images.to(device, dtype=torch.float)
         
         orig_shape = images.shape[2:]
@@ -102,13 +103,14 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
         preds = preds.cpu().numpy().astype(np.uint8)
 
         for i, pred in enumerate(preds):
-            true_mask = preprocess_mask(ls_masks[batch_idx*BATCH_SIZE+i])
+            # true_mask = preprocess_mask(ls_masks[batch_idx*BATCH_SIZE+i])
 
             # The dimensions of the true mask and pred are [width, height] but need to be [1, width, height]
             # they need to stay as numpy arrays not torch tensors
             # pred = np.expand_dims(pred, axis=0)
             # true_mask = np.expand_dims(true_mask, axis=0)
-            true_mask = true_mask.squeeze()
+            # true_mask = true_mask.squeeze()
+            true_mask = masks[i].squeeze()
             pred = pred.squeeze()
             
             # pred = remove_small_objects(pred, 5)
@@ -133,10 +135,6 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
             true_masks[batch_idx*BATCH_SIZE+i] = torch.tensor(true_mask)
             # print(f'3d preds shape: {three_d_preds.shape}, true_masks shape: {true_masks.shape}')
             
-            # compute surface dice score
-    #         surface_dice_score = fast_compute_surface_dice_score_from_tensor(pred, true_mask)
-    #         surface_dice_scores.append(surface_dice_score)
-    # mean_surface_dice_score = np.mean(surface_dice_scores)
     three_d_preds = three_d_preds.numpy()
     true_masks = true_masks.numpy()
     surface_dice_3d = fast_compute_surface_dice_score_from_tensor(three_d_preds, true_masks)
@@ -145,43 +143,13 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
 def main():
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
     load_checkpoint(torch.load(CHECKPOINT_DIR), model)
-    
-    # save_predictions('data_downsampled512/train/kidney_1_voi', model, device=device, num=30)
-    # save_predictions('data/train/kidney_1_voi', model, device=device, num=30)
 
-
-    # ground_truth_rles = create_rle_df('saved_images/kidney_1_voi', subdir_name='labels')
-    # prediction_rles = create_rle_df('saved_images/kidney_1_voi', subdir_name='preds')
-    
-    # # display(ground_truth_rles)
-    # # print(ground_truth_rles.loc[0, 'height'])
-    
-    # surface_dice_score = score(ground_truth_rles, prediction_rles, 'id', 'rle')
-
-    surface_dice_score = local_surface_dice(model, device, dataset_folder=VAL_DATASET_DIR, sub_data_idxs=(500, 515))
-    # surface_dice_score = surface_dice(model)
-
+    surface_dice_score = local_surface_dice(model, device, dataset_folder=VAL_DATASET_DIR, 
+                                            sub_data_idxs=(500, 515), verbose=True)
 
     print(f'Surface Dice Score: {surface_dice_score:.4f}')
     
     plot_examples(model, sub_data_idxs=(500, 1400))
-    
-    # view_examples('saved_images/kidney_1_voi')
-    
-    # # calculate the dice score on the test set
-    # dice_score = calc_dice_score(model, VAL_LOADER, device=device, verbose=True)
-    # # dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, score_type='dice')
-    # # dice_score = eval_and_plot(model, VAL_LOADER, device=device, verbose=True)
-    # # dice_score, iou_score = evaluate(model, VAL_LOADER, device=device, verbose=True, score_type='both')
-    # print(f'Validation Dice Score: {dice_score:.4f}')
-    # # print(f'Validation IoU Score: {iou_score:.4f}')
-
-    # VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=val_transform, shuffle=True)
-    
-    # save_predictions_as_imgs(VAL_LOADER, model, num=30, 
-    #                          folder='saved_images/', device=device)
-
-    # plot_samples(6, title='Predictions', include_image=True)
 
 if __name__ == '__main__':
     main()

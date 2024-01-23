@@ -206,6 +206,10 @@ class ImprovedUNet(nn.Module):
         self.final_conv = nn.Sequential(
             nn.Conv2d(features[1], features[1], kernel_size=1), # 32 channels in, 32 channels out, final convolutional layer
             nn.LeakyReLU(negative_slope=1e-2),
+            # nn.Conv2d(features[1], features[1], kernel_size=1), # 32 channels in, 32 channels out, final convolutional layer
+            # nn.LeakyReLU(negative_slope=1e-2),##
+            # nn.Conv2d(features[1], features[1], kernel_size=1), # 32 channels in, 32 channels out, final convolutional layer
+            # nn.LeakyReLU(negative_slope=1e-2),##
             nn.Conv2d(features[1], out_channels, kernel_size=1) # 32 channels in, 1 channel out, segmentation layer
         )
         

@@ -14,7 +14,7 @@ BATCH_SIZE = 8 if HPC else 4
 NUM_EPOCHS = 15 if HPC else 300
 NUM_WORKERS = 4
 PIN_MEMORY = True
-PREDICTION_THRESHOLD = 0.5#0.5
+PREDICTION_THRESHOLD = 0.6#0.5
 IN_CHANNELS = 1 # I've stacked the previous image, current image, and next image as the input channels
 
 IMAGE_HEIGHT = 512
@@ -42,7 +42,7 @@ VAL_MASK_DIR = VAL_DATASET_DIR + '/labels'
 IMG_FILE_EXT = '.png' if PNG_DSET else '.tif'
 MASK_FILE_EXT = '.png' if PNG_DSET else '.tif'
 
-NOISE_MULTIPLIER = 0.002
+NOISE_MULTIPLIER = 0.0 if TEST_MODE else 0.005
 
 
 # base_path = 'data_downsampled512/train'

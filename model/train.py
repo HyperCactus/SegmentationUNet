@@ -48,9 +48,9 @@ if TEST_MODE:
     # convert to tensor
     img = torch.tensor(img).float()
     msk = torch.tensor(msk).float()
-    # resize to 512x512
-    img = F.interpolate(img.unsqueeze(0), size=(512, 512), mode='bilinear', align_corners=False)
-    msk = F.interpolate(msk.unsqueeze(0).unsqueeze(0), size=(512, 512), mode='bilinear', align_corners=False).squeeze(0)
+    # resize to IMAGE_HEIGHT, IMAGE_WIDTH
+    img = F.interpolate(img.unsqueeze(0), size=(IMAGE_HEIGHT, IMAGE_WIDTH), mode='bilinear', align_corners=False)
+    msk = F.interpolate(msk.unsqueeze(0).unsqueeze(0), size=(IMAGE_HEIGHT, IMAGE_WIDTH), mode='bilinear', align_corners=False).squeeze(0)
     TRAIN_LOADER = [(img, msk)]
 
 writer = SummaryWriter('runs/SenNet/VascularSegmentation')
@@ -93,13 +93,6 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         # forward
         with torch.cuda.amp.autocast():# and torch.autograd.detect_anomaly():
             predictions = model(data)
-            # print(f'Data shape: {data.shape}\n Targets shape: {targets.shape}\n Preds shape: {predictions.shape}')
-            # print(f'Median: {torch.median(predictions)}')
-            # sigmoid
-            
-            # predictions shape [batch size, 1, 512, 512], target shape [batch size, 512, 512] must be same
-            # squees out dim 1, so predictions shape [batch size, 512, 512]
-            # predictions = torch.squeeze(predictions, dim=1)
             loss = loss_fn(predictions, targets)
             if loss.isnan():
                 print('loss is nan')
@@ -109,58 +102,46 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
                 exit(3)
         # backward
         optimizer.zero_grad()
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
         
         if TEST_MODE and (epoch+1) % 5 == 0:
             msk = targets[0].cpu().numpy()
             img = data[0].cpu().numpy()
             pred = F.sigmoid(predictions[0]).cpu().detach().numpy()
             pred = (pred > PREDICTION_THRESHOLD).astype(np.uint8)
-            show_image_pred(img, pred, mask=msk, show=False, save=True, save_dir=f'saved_images/epoch_{epoch+1}.png')
-            # print(f'img shape: {img.shape}, pred shape: {pred.shape}, msk shape: {msk.shape}')
+            save_dir=f'saved_images/testing/epoch_{epoch+1}.png'
+            show_image_pred(img, pred, mask=msk, show=False, save=True, save_dir=save_dir)
             print('SAVED IMAGE')
-            img = torch.tensor(cv2.imread(f'saved_images/epoch_{epoch+1}.png')).permute(2, 0, 1).float() / 255.0
+            img = torch.tensor(cv2.imread(save_dir)).permute(2, 0, 1).float() / 255.0
             writer.add_image('example_predictions', img, epoch)
-
-            # writer.add_image('train_image', img, epoch+1)
-            # writer.add_image('train_mask', msk, epoch+1)
-            # writer.add_image('train_pred', pred, epoch+1)
 
         if check_memory and batch_idx == 10:
             t = torch.cuda.get_device_properties(0).total_memory / 1024**3
             a = torch.cuda.memory_allocated(0) / 1024**3
             print(f'MEMORY USAGE: {a:.2f}GB out of {t:.2f}GB ({a/t*100:.2f}%)')
             check_memory = False
-
-        # if batch_idx % 10 == 0:
-        #     preds = (nn.Sigmoid()(predictions)>PREDICTION_THRESHOLD).double()
         
-        # print(f'type(loss): {type(loss)}, shape: {loss.shape}')
-        # print(f'loss: {loss.item()}')
-        
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
         losses.append(loss.item())
         var = np.var(losses)
-        # stabillity = 1 / (1 + var)
         global STEP
         writer.add_scalar('train_batch_loss', loss.item(), STEP)
         STEP += 1
-        
-        # update tqdm loop
-        loop.set_postfix(loss=loss.item())
+        loop.set_postfix(loss=loss.item()) # update tqdm loop
 
 def train():
     begin_time = time.time()  
     # 3 channels in for RGB images, 1 channel out for binary mask
+    model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1, features=[32,64,128,256,512]).to(device)
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device)
     
     # loss_fn = torch.nn.BCEWithLogitsLoss()
-    # loss_fn = BinaryDiceLoss()
+    loss_fn = BinaryDiceLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
     # loss_fn = EpicLoss() # Custom loss
     # loss_fn = BoundaryDoULoss(1) # Testing this loss function
-    loss_fn = IoULoss(smooth=1) # Testing this loss function
+    # loss_fn = IoULoss(smooth=1) # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
@@ -219,7 +200,7 @@ def train():
         # select a random subvolume from the validation dataset
         n_images = len(glob(os.path.join(VAL_IMG_DIR, '*'+IMG_FILE_EXT)))
         
-        if not TEST_MODE:
+        if HPC:
             loop.set_description('Validating')
             subvol_depth = 500 if HPC else 1
             subvol_start = np.random.randint(0, n_images-subvol_depth)
