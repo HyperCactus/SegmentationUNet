@@ -11,7 +11,7 @@ TEST_MODE = not HPC
 LEARNING_RATE = 1e-4
 BATCH_SIZE = 8 if HPC else 4
 # BATCH_SIZE = 3 # Laptop
-NUM_EPOCHS = 15 if HPC else 300
+NUM_EPOCHS = 100 if HPC else 300
 NUM_WORKERS = 4
 PIN_MEMORY = True
 PREDICTION_THRESHOLD = 0.6#0.5
@@ -42,7 +42,7 @@ VAL_MASK_DIR = VAL_DATASET_DIR + '/labels'
 IMG_FILE_EXT = '.png' if PNG_DSET else '.tif'
 MASK_FILE_EXT = '.png' if PNG_DSET else '.tif'
 
-NOISE_MULTIPLIER = 0.0 if TEST_MODE else 0.005
+NOISE_MULTIPLIER = 0.0 if TEST_MODE else 0.007
 
 
 # base_path = 'data_downsampled512/train'

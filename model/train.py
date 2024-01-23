@@ -9,12 +9,14 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from tqdm import tqdm
 from modules import ImprovedUNet
-from dataset import VAL_LOADER, TRAIN_LOADER, create_loader, augment_image, preprocess_image, preprocess_mask # TRAIN_TRANSFORMS
+from dataset import VAL_LOADER, TRAIN_LOADER, create_loader, augment_image, \
+    preprocess_image, preprocess_mask # TRAIN_TRANSFORMS
 import time
 from utils import *
 from glob import glob
 from torch.utils.tensorboard import SummaryWriter
-from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold, BinaryDiceLoss, BoundaryDoULoss
+from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold, \
+    BinaryDiceLoss, BoundaryDoULoss, IoUDiceLoss
 from global_params import * # Hyperparameters and other global variables
 from evaluate import local_surface_dice as validate
 from PIL import Image
@@ -133,16 +135,17 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
 def train():
     begin_time = time.time()  
     # 3 channels in for RGB images, 1 channel out for binary mask
-    model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1, features=[32,64,128,256,512]).to(device)
+    # model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1, features=[32,64,128,256,512]).to(device)
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device)
     
     # loss_fn = torch.nn.BCEWithLogitsLoss()
-    loss_fn = BinaryDiceLoss()
+    # loss_fn = BinaryDiceLoss()
     # loss_fn = FocalLoss(gamma=2) # Focal Loss dosen't seem to be working, try changing output layer
     # loss_fn = EpicLoss() # Custom loss
     # loss_fn = BoundaryDoULoss(1) # Testing this loss function
     # loss_fn = IoULoss(smooth=1) # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
+    loss_fn = IoUDiceLoss() # Testing this loss function
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus
@@ -208,7 +211,7 @@ def train():
             val_dice_score = validate(model, device=device, dataset_folder=VAL_DATASET_DIR, 
                                     sub_data_idxs=sub_data_idxs, verbose=False)
             val_dice_score = np.round(val_dice_score, 4)
-            loop.set_postfix(val_SDS=val_dice_score)
+            loop.set_description(f'VAL SDC: {val_dice_score}')
             
             dice_scores.append(val_dice_score)
             writer.add_scalar('val_dice_score', val_dice_score, epoch)
@@ -282,16 +285,16 @@ def train():
     if not HPC and not TEST_MODE:
         plt.show()
 
-    # plot loss variance vs epoch
-    plt.figure(figsize=(20, 10))
-    plt.plot(epoch_variances, label='Loss Variance')
-    plt.xlabel('Epoch #')
-    plt.ylabel('Train Loss Variance')
-    plt.title('Average Loss Variance per Epoch')
-    plt.grid(True)
-    plt.savefig('save_data/epoch_variances.png')
-    if not HPC and not TEST_MODE:
-        plt.show()
+    # # plot loss variance vs epoch
+    # plt.figure(figsize=(20, 10))
+    # plt.plot(epoch_variances, label='Loss Variance')
+    # plt.xlabel('Epoch #')
+    # plt.ylabel('Train Loss Variance')
+    # plt.title('Average Loss Variance per Epoch')
+    # plt.grid(True)
+    # plt.savefig('save_data/epoch_variances.png')
+    # if not HPC and not TEST_MODE:
+    #     plt.show()
 
     finish_time = time.time()
     # convert time to hours, minutes, seconds

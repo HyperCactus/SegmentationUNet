@@ -87,6 +87,8 @@ class BinaryDiceLoss(nn.Module):
         self.reduction = reduction
 
     def forward(self, predict, target):
+        print(f' ASSERT {predict.shape[0] == target.shape[0]} IS TRUE')
+        print(f' predict shape: {predict.shape[0]}, target shape: {target.shape[0]}')
         assert predict.shape[0] == target.shape[0], "predict & target batch size don't match"
         predict = predict.contiguous().view(predict.shape[0], -1)
         target = target.contiguous().view(target.shape[0], -1)
@@ -104,6 +106,23 @@ class BinaryDiceLoss(nn.Module):
             return loss
         else:
             raise Exception(f'Unexpected reduction {self.reduction}')
+
+class IoUDiceLoss(nn.Module):
+    def __init__(self, weight=None, size_average=True, smooth=1, iou_weight=0.8, dice_weight=0.2):
+        super(IoUDiceLoss, self).__init__()
+        self.smooth = smooth
+        self.iou_weight = iou_weight
+        self.dice_weight = dice_weight
+        self.dice = BinaryDiceLoss()
+        self.iou = IoULoss()
+
+    def forward(self, prediction, targets):
+        dice_loss = self.dice(prediction, targets)
+        iou_loss = self.iou(prediction, targets)
+        
+        loss = (self.iou_weight * iou_loss) + (self.dice_weight * dice_loss)
+        
+        return loss
 
 ###############################################################################
 # following from: https://github.com/sunfan-bvb/BoundaryDoULoss/blob/main/TransUNet/utils.py

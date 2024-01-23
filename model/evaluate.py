@@ -15,6 +15,7 @@ from glob import glob
 from albumentations.pytorch import ToTensorV2
 from helper import fast_compute_surface_dice_score_from_tensor
 from global_params import *
+import torch.nn.functional as F
 
 
 # set the device to cuda if available
@@ -72,29 +73,43 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
     for batch_idx, (images, masks) in pbar:
         images = images.to(device, dtype=torch.float)
         
-        orig_shape = images.shape[2:]
+        b, c, h, w = images.shape
         
         if batch_idx == 0 and verbose:
-            print(f'Original shape: {orig_shape}')
+            print(f'Original shape: {h}x{w}')
         
         # TTA
         tta_lambdas = [lambda x: x, 
                        lambda x: torch.flip(x, dims=[3]),
                        lambda x: torch.flip(x, dims=[2]), 
                        lambda x: torch.flip(torch.flip(x, dims=[2]), dims=[3])]    
-            
-        preds = torch.zeros((images.shape[0], 1, orig_shape[0], orig_shape[1])).to(device)
+        
+        # # dwonsample the image to its original size / 2 or 512 if it's smaller than 512
+        # s_h = h//2 if h//2 >= 512 else 512
+        # s_w = w//2 if w//2 >= 512 else 512
+        # s_imgs = F.interpolate(images, size=(s_h, s_w), mode='bilinear', align_corners=False)
+        # if verbose and batch_idx == 0:
+        #     print(f'Small image shape: {s_imgs.shape}')
+        
+        preds = torch.zeros((b, 1, h, w)).to(device)
         
         for tta_fn in tta_lambdas:
             tta_img = tta_fn(images)
+            # s_tta_img = tta_fn(s_imgs)
             tiles = batch_tiling_split(tta_img, TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+            # s_tiles = batch_tiling_split(s_tta_img, TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
         
             model.eval()
             with torch.no_grad():
                 tile_preds = [model(tile) for tile in tiles]
-                
-            tta_preds = recombine_tiles(tile_preds, orig_shape, TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+                # s_tile_preds = [model(s_tile) for s_tile in s_tiles]
+            
+            tta_preds = recombine_tiles(tile_preds, (h, w), TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
             # preds += torch.flip(tta_fn(tta_preds), dims=[3])
+            # s_pred = recombine_tiles(s_tile_preds, (s_h, s_w), TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+            # s_pred = tta_fn(s_pred)
+            # preds += F.interpolate(s_pred, size=(h, w), mode='bilinear', align_corners=False)
+            
             preds += tta_fn(tta_preds)
                 
         preds /= len(tta_lambdas)

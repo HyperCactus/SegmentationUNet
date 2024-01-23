@@ -113,3 +113,9 @@ a100-test*
 
 * test with/without noise, 3 vs 1 in_chans, ..., png data on rangpur 
 * try multiple optimizers with different loss functions...
+* add multiscale inference pipeline
+
+* experiment result, iou loss, 15 epoch, on val set (500, 1400)
+3D SDC = 0.7060
+* binary dice loss, 15 epoch, on val set (500, 1400)
+3D SDC = 0.6105
