@@ -124,6 +124,22 @@ class IoUDiceLoss(nn.Module):
         
         return loss
 
+class CustomFocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2.0):
+        super(CustomFocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.iou = IoULoss()
+
+    def forward(self, inputs, targets):
+        # inputs = torch.sigmoid(inputs)
+        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
+        IoU_loss = self.iou(inputs, targets)
+        l = 0.9*IoU_loss + 0.1*BCE_loss
+        pt = torch.exp(-l)  # prevents nans when probability 0
+        F_loss = self.alpha * (1 - pt) ** self.gamma * l
+        return F_loss.mean()
+
 ###############################################################################
 # following from: https://github.com/sunfan-bvb/BoundaryDoULoss/blob/main/TransUNet/utils.py
 

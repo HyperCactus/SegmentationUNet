@@ -18,39 +18,6 @@ from global_params import *
 import torch.nn.functional as F
 
 
-# set the device to cuda if available
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-def preprocess_mask(path):
-    msk = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-    msk = msk.astype('float32')
-    msk/=255.0
-    msk_ten = torch.tensor(msk)
-    
-    return msk_ten
-
-def test_transform(image):
-    
-    image_np = image.permute(1, 2, 0).numpy()
-
-    transform = A.Compose([
-        # A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
-        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
-    ])
-
-    augmented = transform(image=image_np)
-    augmented_image = augmented['image']
-
-    augmented_image = torch.tensor(augmented_image, dtype=torch.float32).permute(2, 0, 1)
-
-    return augmented_image
-
-def create_test_loader(image_files, batch_size, 
-                  augmentations=None, shuffle=False):
-    
-    dataset = UsageDataset(image_files, augmentation_transforms=augmentations)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
 def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub_data_idxs=None, verbose=False):
     
     ls_images = glob(os.path.join(dataset_folder, "images", "*"+IMG_FILE_EXT))
@@ -59,8 +26,10 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
         ls_images = ls_images[sub_data_idxs[0]:sub_data_idxs[1]]
         ls_masks = ls_masks[sub_data_idxs[0]:sub_data_idxs[1]]
     
-    test_loader = create_test_loader(ls_images, BATCH_SIZE, augmentations=None)
-    val_loader = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=None, shuffle=False, sub_data_idxs=sub_data_idxs)
+    # test_loader = create_test_loader(ls_images, BATCH_SIZE, augmentations=None)
+    val_loader = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, 
+                               transform=val_transform, shuffle=False, 
+                               sub_data_idxs=sub_data_idxs)
 
     # create a 3d tensor of zeros to store the predictions for the whole kidney for 3D surface dice score
     # also need a 3d tensor of zeros for the true mask
@@ -76,7 +45,7 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
         b, c, h, w = images.shape
         
         if batch_idx == 0 and verbose:
-            print(f'Original shape: {h}x{w}')
+            print(f'Original shape: b={b}, c={c}, h x w = {h}x{w}')
         
         # TTA
         tta_lambdas = [lambda x: x, 
@@ -96,15 +65,23 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
         for tta_fn in tta_lambdas:
             tta_img = tta_fn(images)
             # s_tta_img = tta_fn(s_imgs)
+            
             tiles = batch_tiling_split(tta_img, TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
             # s_tiles = batch_tiling_split(s_tta_img, TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+            noise = torch.randn_like(tiles[0])*NOISE_MULTIPLIER
         
             model.eval()
             with torch.no_grad():
-                tile_preds = [model(tile) for tile in tiles]
+                tile_preds = [model(tile+torch.randn_like(tile)*NOISE_MULTIPLIER) for tile in tiles]
                 # s_tile_preds = [model(s_tile) for s_tile in s_tiles]
+                
+                # if verbose and batch_idx == 0:
+                #     # show some tiles for debugging
+                #     show_image_pred(tiles[6][0].cpu(), F.sigmoid(tile_preds[6][0]).cpu(), title='Tile 6')
             
             tta_preds = recombine_tiles(tile_preds, (h, w), TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+            # if verbose and batch_idx == 0:
+            #     show_image_pred(tta_img[0].cpu(), F.sigmoid(tta_preds[0]).cpu(), mask=tta_fn(masks.unsqueeze(1))[0][0].cpu())
             # preds += torch.flip(tta_fn(tta_preds), dims=[3])
             # s_pred = recombine_tiles(s_tile_preds, (s_h, s_w), TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
             # s_pred = tta_fn(s_pred)
@@ -114,9 +91,11 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
                 
         preds /= len(tta_lambdas)
 
-        preds = (nn.Sigmoid()(preds)>PREDICTION_THRESHOLD).double()
+        preds = torch.sigmoid(preds) # make sure the predictions are between 0 and 1
+        preds = (preds>PREDICTION_THRESHOLD).double() # threshold the predictions
+        # preds = (nn.Sigmoid()(preds)>PREDICTION_THRESHOLD).double()
         preds = preds.cpu().numpy().astype(np.uint8)
-
+        
         for i, pred in enumerate(preds):
             # true_mask = preprocess_mask(ls_masks[batch_idx*BATCH_SIZE+i])
 
@@ -125,7 +104,7 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
             # pred = np.expand_dims(pred, axis=0)
             # true_mask = np.expand_dims(true_mask, axis=0)
             # true_mask = true_mask.squeeze()
-            true_mask = masks[i].squeeze()
+            true_mask = masks[i].squeeze().cpu()
             pred = pred.squeeze()
             
             # pred = remove_small_objects(pred, 5)
@@ -147,7 +126,7 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
 
             # print(f'pred shape: {pred.shape}, true_mask shape: {true_mask.shape}')
             three_d_preds[batch_idx*BATCH_SIZE+i] = torch.tensor(pred)
-            true_masks[batch_idx*BATCH_SIZE+i] = torch.tensor(true_mask)
+            true_masks[batch_idx*BATCH_SIZE+i] = true_mask.clone().detach()
             # print(f'3d preds shape: {three_d_preds.shape}, true_masks shape: {true_masks.shape}')
             
     three_d_preds = three_d_preds.numpy()
@@ -156,6 +135,9 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
     return surface_dice_3d#mean_surface_dice_score
 
 def main():
+    # set the device to cuda if available
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
     load_checkpoint(torch.load(CHECKPOINT_DIR), model)
 

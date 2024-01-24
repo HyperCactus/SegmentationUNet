@@ -910,7 +910,7 @@ def plot_examples(model, num=5, device='cuda',
 
 def show_image_pred(img, pred, mask=None, 
                     figsize=(10, 6),
-                    title='Image, Prediction, Mask',
+                    title='Image, Prediction, (Mask)',
                     save=False, save_dir=None, show=True):
     """
     Plots the original image, the prediction and the mask side by side

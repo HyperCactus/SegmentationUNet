@@ -15,7 +15,7 @@ import time
 from utils import *
 from glob import glob
 from torch.utils.tensorboard import SummaryWriter
-from costom_loss import FocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold, \
+from costom_loss import CustomFocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold, \
     BinaryDiceLoss, BoundaryDoULoss, IoUDiceLoss
 from global_params import * # Hyperparameters and other global variables
 from evaluate import local_surface_dice as validate
@@ -145,7 +145,8 @@ def train():
     # loss_fn = BoundaryDoULoss(1) # Testing this loss function
     # loss_fn = IoULoss(smooth=1) # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
-    loss_fn = IoUDiceLoss() # Testing this loss function
+    # loss_fn = IoUDiceLoss() # Testing this loss function
+    loss_fn = CustomFocalLoss(alpha=0.1, gamma=4.0)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus

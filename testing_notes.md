@@ -113,9 +113,15 @@ a100-test*
 
 * test with/without noise, 3 vs 1 in_chans, ..., png data on rangpur 
 * try multiple optimizers with different loss functions...
-* add multiscale inference pipeline
+* add multiscale inference pipeline tried, made SDC worse
 
 * experiment result, iou loss, 15 epoch, on val set (500, 1400)
 3D SDC = 0.7060
 * binary dice loss, 15 epoch, on val set (500, 1400)
 3D SDC = 0.6105
+* 8.0 x iou loss + 0.2 x dice loss, 100 epoch, on val set (500, 1400)
+3D SDC = 0.7015
+
+* train a 256 model
+
+* Somethings not right!!

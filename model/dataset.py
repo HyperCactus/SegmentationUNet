@@ -361,8 +361,9 @@ def augment_image(image, mask):
     transform = A.Compose([
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
-        A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=180, shift_limit=0.1, p=0.8, border_mode=0),
-        A.Affine(shear=(-10, 10), p=0.5), # Untested addition (shear transform)
+        A.ShiftScaleRotate(scale_limit=(-0.3, 0.1), rotate_limit=180, shift_limit=0.1, p=0.8, border_mode=0), # for 1024 model
+        # A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=180, shift_limit=0.1, p=0.8, border_mode=0),
+        A.Affine(shear=(-10, 10), p=0.4), # Untested addition (shear transform)
         A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.1, 0.1), contrast_limit=(-0.2, 0.2)),
         A.OneOf(
             [
@@ -390,8 +391,9 @@ def val_transform(image, mask):
     mask_np = mask.numpy()
 
     transform = A.Compose([
-        A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
-        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+        # A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
+        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=False, p=0),  # High pass filter
+        # add the identity transform to do nothing
     ])
 
     augmented = transform(image=image_np, mask=mask_np)
@@ -429,7 +431,7 @@ TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE,
                             transform=augment_image, shuffle=True)
 
 
-test_mode = False#True
+test_mode = True
 # print(len(kidney_1_voi_loader))
 
 if test_mode:
@@ -445,7 +447,7 @@ if test_mode:
         print("Mask batch shape:", batch_masks.shape)
         
         for image, mask in zip(batch_images, batch_masks):
-            noise = torch.randn_like(image) * NOISE_MULTIPLIER
+            noise = torch.randn_like(image) * 0.00
             image = image + noise
             image = image.permute((1, 2, 0)).numpy()*255.0;
             print(f'image.shape: {image.shape}')
