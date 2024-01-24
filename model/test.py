@@ -5,7 +5,7 @@ import cv2
 import os
 from modules import ImprovedUNet
 from glob import glob
-from utils import inference_fn, load_checkpoint, plot_examples
+from utils import inference_fn, load_checkpoint, plot_examples, min_size
 from dataset import preprocess_image, preprocess_mask
 from global_params import *
         
@@ -19,11 +19,15 @@ if __name__ == '__main__':
 
     # plot_examples(model, num=5, device='cpu', dataset_folder=VAL_DATASET_DIR, sub_data_idxs=(500, 1400))
     
-    print('Hyperparameters', 
-            f'Learning Rate: {LEARNING_RATE}, \
-Batch Size: {BATCH_SIZE}, Epochs: {NUM_EPOCHS}, Num Workers: {NUM_WORKERS}, \
-Pin Memory: {PIN_MEMORY}, Prediction Threshold: {PREDICTION_THRESHOLD}, \
-In Channels: {IN_CHANNELS}, Image Height: {IMAGE_HEIGHT}, Image Width: {IMAGE_WIDTH}, \
-High Pass Alpha: {HIGH_PASS_ALPHA}, High Pass Strength: {HIGH_PASS_STRENGTH}, \
-Tiles in X: {TILES_IN_X}, Tiles in Y: {TILES_IN_Y}, Tile Size: {TILE_SIZE}, \
-Noise Multiplier: {NOISE_MULTIPLIER}')
+    # img = preprocess_image('data_png/train/kidney_1_dense/images/0610.png')
+    img = preprocess_image('data_png/train/kidney_3_dense/images/0610.png')
+    c, h, w = img.shape
+    print(f'Original size: {h}x{w}')
+    img = min_size(img)
+    nh, nw = img.shape[1:]
+    print(f'New size: {nh}x{nw}')
+    img = img.permute(1, 2, 0).numpy()
+    
+    plt.figure(figsize=(10, 10))
+    plt.imshow(img, cmap='gray')
+    plt.show()

@@ -937,3 +937,11 @@ def show_image_pred(img, pred, mask=None,
         plt.show()
     else:
         plt.close()
+
+def get_tile_nums(h, w, tile_size=TILE_SIZE, min_overlap=0.5):
+    """
+    Returns the number of tiles in the x and y direction for the given image
+    """
+    tiles_in_x = 1 if w == tile_size else math.ceil(w / (tile_size * (1 - min_overlap)))
+    tiles_in_y = 1 if h == tile_size else math.ceil(h / (tile_size * (1 - min_overlap)))
+    return tiles_in_x, tiles_in_y

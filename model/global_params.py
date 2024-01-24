@@ -17,8 +17,8 @@ PIN_MEMORY = True
 PREDICTION_THRESHOLD = 0.6125#0.5
 IN_CHANNELS = 1 # I've stacked the previous image, current image, and next image as the input channels
 
-IMAGE_HEIGHT = 1024#512
-IMAGE_WIDTH = 1024#512
+IMAGE_HEIGHT = 1024
+IMAGE_WIDTH = 1024
 
 HIGH_PASS_ALPHA = 0.1
 HIGH_PASS_STRENGTH = 0.1
@@ -26,7 +26,7 @@ HIGH_PASS_STRENGTH = 0.1
 TILES_IN_X = 4
 TILES_IN_Y = 3
 
-TILE_SIZE = 1024#512
+TILE_SIZE = 1024
 
 # CHECKPOINT_DIR = 'checkpoints/checkpoint.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/in_chans3.pth.tar'

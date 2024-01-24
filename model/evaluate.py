@@ -43,6 +43,7 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
         images = images.to(device, dtype=torch.float)
         
         b, c, h, w = images.shape
+        tiles_in_x, tiles_in_y = get_tile_nums(h, w, tile_size=TILE_SIZE)
         
         if batch_idx == 0 and verbose:
             print(f'Original shape: b={b}, c={c}, h x w = {h}x{w}')
@@ -66,9 +67,9 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
             tta_img = tta_fn(images)
             # s_tta_img = tta_fn(s_imgs)
             
-            tiles = batch_tiling_split(tta_img, TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+            tiles = batch_tiling_split(tta_img, TILE_SIZE, tiles_in_x=tiles_in_x, tiles_in_y=tiles_in_y)
             # s_tiles = batch_tiling_split(s_tta_img, TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
-            noise = torch.randn_like(tiles[0])*NOISE_MULTIPLIER
+            # noise = torch.randn_like(tiles[0])*NOISE_MULTIPLIER
         
             model.eval()
             with torch.no_grad():
@@ -79,7 +80,7 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
                 #     # show some tiles for debugging
                 #     show_image_pred(tiles[6][0].cpu(), F.sigmoid(tile_preds[6][0]).cpu(), title='Tile 6')
             
-            tta_preds = recombine_tiles(tile_preds, (h, w), TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+            tta_preds = recombine_tiles(tile_preds, (h, w), TILE_SIZE, tiles_in_x=tiles_in_x, tiles_in_y=tiles_in_y)
             # if verbose and batch_idx == 0:
             #     show_image_pred(tta_img[0].cpu(), F.sigmoid(tta_preds[0]).cpu(), mask=tta_fn(masks.unsqueeze(1))[0][0].cpu())
             # preds += torch.flip(tta_fn(tta_preds), dims=[3])

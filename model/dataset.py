@@ -315,7 +315,7 @@ class UsageDataset(Dataset):
         return image, torch.tensor(np.array([orig_size[0], orig_size[1]]))
 
 
-def preprocess_image(path, return_size=False):
+def preprocess_image(path):
     # print(f'path: {path}')
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
@@ -339,10 +339,7 @@ def preprocess_image(path, return_size=False):
     # print(f'process image img.shape: {img.shape}')
     img = np.transpose(img, (2, 0, 1))
     img_ten = torch.tensor(img)
-    if return_size:
-        return img_ten, orig_size
-    else:
-        return img_ten
+    return min_size(img_ten, min_size=TILE_SIZE)
 
 def preprocess_mask(path):
     
@@ -351,7 +348,7 @@ def preprocess_mask(path):
     msk/=255.0
     msk_ten = torch.tensor(msk)
     
-    return msk_ten
+    return min_size(msk_ten, min_size=TILE_SIZE)
 
 def augment_image(image, mask):
     
@@ -404,6 +401,17 @@ def val_transform(image, mask):
 
     return augmented_image, augmented_mask
 
+def min_size(img, min_size=1024):
+    """
+    If the image is smaller than the min_size on any dimension, 
+    then pad the image to be at least min_size on that dimension.
+    """
+    h, w = img.shape[-2:] # this works for single image or batch
+    x_pad = 0 if w >= min_size else (min_size - w) // 2
+    y_pad = 0 if h >= min_size else (min_size - h) // 2
+    new_img = nn.ZeroPad2d((x_pad, x_pad, y_pad, y_pad))(img)
+    return new_img
+
 def create_loader(image_files, mask_files, batch_size, 
                   transform=None, shuffle=False, sub_data_idxs=None):
     
@@ -431,7 +439,7 @@ TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE,
                             transform=augment_image, shuffle=True)
 
 
-test_mode = True
+test_mode = False#True
 # print(len(kidney_1_voi_loader))
 
 if test_mode:
