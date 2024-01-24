@@ -28,6 +28,7 @@ Images are broken into 512x512 tiles that are uniformly distributed over the ima
 ![figure 3: example of tiling](_readme_ims/tiling_example.png)
 
 ## Model:
+Improved unet paper, attention unet paper
 
 ## References:
 1. Yashvardhan Jain, Katy Borner, Claire Walsh, Nancy Ruschman, Peter D. Lee, Griffin M. Weber, Ryan Holbrook, Addison Howard. (2023). SenNet + HOA - Hacking the Human Vasculature in 3D. Kaggle. https://kaggle.com/competitions/blood-vessel-segmentation
