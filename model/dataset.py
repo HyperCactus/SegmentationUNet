@@ -331,8 +331,6 @@ def preprocess_image(path):
     mx = np.max(img)
     if mx:
         img/=mx
-        mean = np.mean(img)
-        img -= mean
 
     orig_size = img.shape
     
@@ -439,7 +437,7 @@ TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE,
                             transform=augment_image, shuffle=True)
 
 
-test_mode = False#True
+test_mode = True
 # print(len(kidney_1_voi_loader))
 
 if test_mode:
@@ -455,7 +453,7 @@ if test_mode:
         print("Mask batch shape:", batch_masks.shape)
         
         for image, mask in zip(batch_images, batch_masks):
-            noise = torch.randn_like(image) * 0.00
+            noise = torch.randn_like(image) * NOISE_MULTIPLIER
             image = image + noise
             image = image.permute((1, 2, 0)).numpy()*255.0;
             print(f'image.shape: {image.shape}')
