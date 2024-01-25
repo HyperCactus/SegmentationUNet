@@ -282,8 +282,8 @@ class CustomDataset(Dataset):
         image_path = self.image_files[idx]
         mask_path = self.mask_files[idx]
 
-        image = preprocess_image(image_path)
-        mask = preprocess_mask(mask_path)
+        image = min_size(preprocess_image(image_path), min_size=TILE_SIZE)
+        mask = min_size(preprocess_mask(mask_path), min_size=TILE_SIZE)
 
         if self.augmentation_transforms:
             image, mask = self.augmentation_transforms(image, mask)
@@ -337,7 +337,7 @@ def preprocess_image(path):
     # print(f'process image img.shape: {img.shape}')
     img = np.transpose(img, (2, 0, 1))
     img_ten = torch.tensor(img)
-    return min_size(img_ten, min_size=TILE_SIZE)
+    return img_ten
 
 def preprocess_mask(path):
     
@@ -346,7 +346,7 @@ def preprocess_mask(path):
     msk/=255.0
     msk_ten = torch.tensor(msk)
     
-    return min_size(msk_ten, min_size=TILE_SIZE)
+    return msk_ten
 
 def augment_image(image, mask):
     
@@ -437,7 +437,7 @@ TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE,
                             transform=augment_image, shuffle=True)
 
 
-test_mode = True
+test_mode = False#True
 # print(len(kidney_1_voi_loader))
 
 if test_mode:
