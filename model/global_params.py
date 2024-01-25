@@ -9,7 +9,7 @@ TEST_MODE = not HPC
 # Hyperparameters
 # LEARNING_RATE = 1e-4
 LEARNING_RATE = 1e-4
-BATCH_SIZE = 4 if HPC else 4
+BATCH_SIZE = 2 if HPC else 4
 # BATCH_SIZE = 3 # Laptop
 NUM_EPOCHS = 30 if HPC else 300
 NUM_WORKERS = 4
