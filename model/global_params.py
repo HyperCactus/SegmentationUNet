@@ -2,7 +2,7 @@
 Global parameters for the UNet model defined here for easy access across files.
 """
 
-HPC = True
+HPC = False#True
 PNG_DSET = True
 TEST_MODE = not HPC
 

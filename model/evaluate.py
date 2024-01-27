@@ -107,7 +107,7 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
             # true_mask = true_mask.squeeze()
             true_mask = masks[i].squeeze().cpu()
             pred = pred.squeeze()
-            pred = remove_small_objects(pred, 100)
+            # pred = remove_small_objects(pred, 100)
 
             if verbose and batch_idx == 0 and i == 0:
                 print(f'pred shape: {pred.shape}, true_mask shape: {true_mask.shape}')
@@ -138,15 +138,21 @@ def main():
     # set the device to cuda if available
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
-    load_checkpoint(torch.load(CHECKPOINT_DIR), model)
+    model_512 = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
+    load_checkpoint(torch.load('checkpoints/big_train.pth.tar'), model_512)
+    model_1024 = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
+    load_checkpoint(torch.load('checkpoints/1024_model.pth.tar'), model_1024)
+    models = [model_512, model_1024]
+    sizes = [512, 1024]
 
-    surface_dice_score = local_surface_dice(model, device, dataset_folder=VAL_DATASET_DIR, 
+    surface_dice_score = local_surface_dice(model_512, device, dataset_folder=VAL_DATASET_DIR, 
                                             sub_data_idxs=(500, 515), verbose=True)
+    # surface_dice_score = local_surface_dice_multiscale(models, sizes, device, dataset_folder=VAL_DATASET_DIR, 
+    #                                         sub_data_idxs=(500, 515), verbose=True)
 
     print(f'Surface Dice Score: {surface_dice_score:.4f}')
     
-    plot_examples(model, sub_data_idxs=(500, 1400))
+    plot_examples(model_512, sub_data_idxs=(500, 1400))
 
 if __name__ == '__main__':
     main()

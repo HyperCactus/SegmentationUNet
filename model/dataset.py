@@ -111,7 +111,7 @@ def preprocess_mask(path):
     msk = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     msk = msk.astype('float32')
     msk/=255.0
-    msk = remove_small_objects(msk.astype(np.uint8), 500)
+    # msk = remove_small_objects(msk.astype(np.uint8), 500)
     msk_ten = torch.tensor(msk)
     
     return msk_ten
