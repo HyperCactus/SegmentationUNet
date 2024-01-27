@@ -107,8 +107,7 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
             # true_mask = true_mask.squeeze()
             true_mask = masks[i].squeeze().cpu()
             pred = pred.squeeze()
-            
-            # pred = remove_small_objects(pred, 5)
+            pred = remove_small_objects(pred, 100)
 
             if verbose and batch_idx == 0 and i == 0:
                 print(f'pred shape: {pred.shape}, true_mask shape: {true_mask.shape}')

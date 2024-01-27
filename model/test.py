@@ -5,7 +5,7 @@ import cv2
 import os
 from modules import ImprovedUNet
 from glob import glob
-from utils import inference_fn, load_checkpoint, plot_examples, min_size
+from utils import inference_fn, load_checkpoint, plot_examples, remove_small_objects
 from dataset import preprocess_image, preprocess_mask
 from global_params import *
         
@@ -20,14 +20,20 @@ if __name__ == '__main__':
     # plot_examples(model, num=5, device='cpu', dataset_folder=VAL_DATASET_DIR, sub_data_idxs=(500, 1400))
     
     # img = preprocess_image('data_png/train/kidney_1_dense/images/0610.png')
-    img = preprocess_image('data_png/train/kidney_3_dense/images/0610.png')
+    img = preprocess_image('data_png/train/kidney_2/images/1262.png')
+    mask = preprocess_mask('data_png/train/kidney_2/labels/1262.png')
     c, h, w = img.shape
     print(f'Original size: {h}x{w}')
-    img = min_size(img)
     nh, nw = img.shape[1:]
-    print(f'New size: {nh}x{nw}')
     img = img.permute(1, 2, 0).numpy()
+    mask = mask.numpy().astype(np.uint8)
+    print(f'Mask shape: {mask.shape}')
+    mask = remove_small_objects(mask, 600)
+    print(f'Sum of mask: {np.sum(mask)}')
     
     plt.figure(figsize=(10, 10))
+    plt.subplot(1, 2, 1)
     plt.imshow(img, cmap='gray')
+    plt.subplot(1, 2, 2)
+    plt.imshow(mask)
     plt.show()

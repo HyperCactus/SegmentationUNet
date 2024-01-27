@@ -945,3 +945,15 @@ def get_tile_nums(h, w, tile_size=TILE_SIZE, min_overlap=0.5):
     tiles_in_x = 1 if w == tile_size else math.ceil(w / (tile_size * (1 - min_overlap)))
     tiles_in_y = 1 if h == tile_size else math.ceil(h / (tile_size * (1 - min_overlap)))
     return tiles_in_x, tiles_in_y# wtf
+
+def remove_small_objects(img, min_size):
+    # Find all connected components (labels)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img, connectivity=8)
+
+    # Create a mask where small objects are removed
+    new_img = np.zeros_like(img)
+    for label in range(1, num_labels):
+        if stats[label, cv2.CC_STAT_AREA] >= min_size:
+            new_img[labels == label] = 1
+
+    return new_img

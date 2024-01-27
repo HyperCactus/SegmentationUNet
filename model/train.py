@@ -86,6 +86,10 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
     length = len(loader)
     # loop = loader
     for batch_idx, (data, targets) in enumerate(this_loop):
+        # this is for training to identify large ateries and veins
+        if torch.sum(targets) > 10000 and np.random.random() > 0.5:
+            continue
+        
         data = data.to(device=device)
         targets = targets.float().unsqueeze(1).to(device=device)
         
@@ -146,7 +150,7 @@ def train():
     # loss_fn = IoULoss(smooth=1) # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     # loss_fn = IoUDiceLoss() # Testing this loss function
-    loss_fn = CustomFocalLoss(alpha=0.1, gamma=4.0)
+    loss_fn = CustomFocalLoss(alpha=0.1, gamma=5.0)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus

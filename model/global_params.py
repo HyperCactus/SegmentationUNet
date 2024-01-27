@@ -9,7 +9,7 @@ TEST_MODE = not HPC
 # Hyperparameters
 # LEARNING_RATE = 1e-4
 LEARNING_RATE = 1e-4
-BATCH_SIZE = 6 if HPC else 4
+BATCH_SIZE = 6 if HPC else 1
 # BATCH_SIZE = 3 # Laptop
 NUM_EPOCHS = 30 if HPC else 300
 NUM_WORKERS = 4
@@ -31,7 +31,8 @@ TILE_SIZE = 1024
 # CHECKPOINT_DIR = 'checkpoints/checkpoint.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/in_chans3.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/IoU_loss_15ep.pth.tar'
-CHECKPOINT_DIR = 'checkpoints/big_train.pth.tar'
+# CHECKPOINT_DIR = 'checkpoints/big_train.pth.tar'
+CHECKPOINT_DIR = 'checkpoints/1024_model.pth.tar'
 
 if PNG_DSET:
     BASE_PATH = 'data_png/train'
