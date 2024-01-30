@@ -102,6 +102,16 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2",
                 mask_rels.append(mask_rel)
     
     if fast_mode:
+        # sanity check
+        plt.figure(figsize=(10, 10))
+        plt.subplot(1, 3, 1)
+        plt.imshow(z_preds_vol[:, :, 0], cmap='gray')
+        plt.title('z preds')
+        plt.subplot(1, 3, 2)
+        plt.imshow(x_preds_vol[0, :, :], cmap='gray')
+        plt.title('x preds')
+        plt.subplot(1, 3, 3)
+        plt.imshow(y_preds_vol[:, 0, :], cmap='gray')
         # rotate the x and y preds to match the z preds
         x_preds_vol = x_preds_vol.permute(2, 1, 0)
         y_preds_vol = y_preds_vol.permute(0, 2, 1)

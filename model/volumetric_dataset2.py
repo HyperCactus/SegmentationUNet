@@ -213,8 +213,8 @@ for kidney in TRAIN_DATASETS:
     image_dirs.append(os.path.join(BASE_PATH, kidney, 'images'))
     mask_dirs.append(os.path.join(BASE_PATH, kidney, 'labels'))
 
-# TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE, 
-#                             transform_2d=transform, shuffle=True)
+TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE, 
+                            transform_2d=transform, shuffle=True)
 
 
 test_mode = False#True
