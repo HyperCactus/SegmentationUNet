@@ -87,7 +87,7 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         #     continue
         
         data = data.to(device=device)
-        targets = targets.float().unsqueeze(1).to(device=device)
+        targets = targets.float().to(device=device)
         
         # if not TEST_MODE:
         noise = torch.randn_like(data) * NOISE_MULTIPLIER
