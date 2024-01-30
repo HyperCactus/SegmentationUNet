@@ -125,3 +125,4 @@ a100-test*
 * train a 256 model
 
 * Somethings not right!!
+* Fix normalization on volumetric dataset!!!

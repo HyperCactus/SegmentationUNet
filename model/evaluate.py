@@ -42,60 +42,68 @@ def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", sub
     for batch_idx, (images, masks) in pbar:
         images = images.to(device, dtype=torch.float)
         
-        b, c, h, w = images.shape
-        tiles_in_x, tiles_in_y = get_tile_nums(h, w, tile_size=TILE_SIZE)
+        preds = inference_fn(model, images)
         
-        if batch_idx == 0 and verbose:
-            print(f'Original shape: b={b}, c={c}, h x w = {h}x{w}')
-        
-        # TTA
-        tta_lambdas = [lambda x: x, 
-                       lambda x: torch.flip(x, dims=[3]),
-                       lambda x: torch.flip(x, dims=[2]), 
-                       lambda x: torch.flip(torch.flip(x, dims=[2]), dims=[3])]    
-        
-        # # dwonsample the image to its original size / 2 or 512 if it's smaller than 512
-        # s_h = h//2 if h//2 >= 512 else 512
-        # s_w = w//2 if w//2 >= 512 else 512
-        # s_imgs = F.interpolate(images, size=(s_h, s_w), mode='bilinear', align_corners=False)
+        # b, c, h, w = images.shape
+        # tiles_in_x, tiles_in_y = get_tile_nums(h, w, tile_size=TILE_SIZE)
         # if verbose and batch_idx == 0:
-        #     print(f'Small image shape: {s_imgs.shape}')
+        #     print(f'Tiles in x: {tiles_in_x}, tiles in y: {tiles_in_y}')
         
-        preds = torch.zeros((b, 1, h, w)).to(device)
+        # if batch_idx == 0 and verbose:
+        #     print(f'Original shape: b={b}, c={c}, h x w = {h}x{w}')
         
-        for tta_fn in tta_lambdas:
-            tta_img = tta_fn(images)
-            # s_tta_img = tta_fn(s_imgs)
+        # # TTA
+        # tta_lambdas = [lambda x: x, 
+        #                lambda x: torch.flip(x, dims=[3]),
+        #                lambda x: torch.flip(x, dims=[2]), 
+        #                lambda x: torch.flip(torch.flip(x, dims=[2]), dims=[3])]    
+        
+        # # # dwonsample the image to its original size / 2 or 512 if it's smaller than 512
+        # # s_h = h//2 if h//2 >= 512 else 512
+        # # s_w = w//2 if w//2 >= 512 else 512
+        # # s_imgs = F.interpolate(images, size=(s_h, s_w), mode='bilinear', align_corners=False)
+        # # if verbose and batch_idx == 0:
+        # #     print(f'Small image shape: {s_imgs.shape}')
+        
+        # preds = torch.zeros((b, 1, h, w)).to(device)
+        # pred_list = []
+        
+        # for tta_fn in tta_lambdas:
+        #     tta_img = tta_fn(images)
+        #     # s_tta_img = tta_fn(s_imgs)
             
-            tiles = batch_tiling_split(tta_img, TILE_SIZE, tiles_in_x=tiles_in_x, tiles_in_y=tiles_in_y)
-            # s_tiles = batch_tiling_split(s_tta_img, TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
-            # noise = torch.randn_like(tiles[0])*NOISE_MULTIPLIER
+        #     tiles = batch_tiling_split(tta_img, TILE_SIZE, tiles_in_x=tiles_in_x, tiles_in_y=tiles_in_y)
+        #     # s_tiles = batch_tiling_split(s_tta_img, TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+        #     # noise = torch.randn_like(tiles[0])*NOISE_MULTIPLIER
         
-            model.eval()
-            with torch.no_grad():
-                tile_preds = [model(tile+torch.randn_like(tile)*NOISE_MULTIPLIER) for tile in tiles]
-                # s_tile_preds = [model(s_tile) for s_tile in s_tiles]
+        #     model.eval()
+        #     with torch.no_grad():
+        #         tile_preds = [model(tile+torch.randn_like(tile)*NOISE_MULTIPLIER) for tile in tiles]
+        #         # s_tile_preds = [model(s_tile) for s_tile in s_tiles]
                 
-                # if verbose and batch_idx == 0:
-                #     # show some tiles for debugging
-                #     show_image_pred(tiles[6][0].cpu(), F.sigmoid(tile_preds[6][0]).cpu(), title='Tile 6')
+        #         # if verbose and batch_idx == 0:
+        #         #     # show some tiles for debugging
+        #         #     show_image_pred(tiles[6][0].cpu(), F.sigmoid(tile_preds[6][0]).cpu(), title='Tile 6')
             
-            tta_preds = recombine_tiles(tile_preds, (h, w), TILE_SIZE, tiles_in_x=tiles_in_x, tiles_in_y=tiles_in_y)
-            # if verbose and batch_idx == 0:
-            #     show_image_pred(tta_img[0].cpu(), F.sigmoid(tta_preds[0]).cpu(), mask=tta_fn(masks.unsqueeze(1))[0][0].cpu())
-            # preds += torch.flip(tta_fn(tta_preds), dims=[3])
-            # s_pred = recombine_tiles(s_tile_preds, (s_h, s_w), TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
-            # s_pred = tta_fn(s_pred)
-            # preds += F.interpolate(s_pred, size=(h, w), mode='bilinear', align_corners=False)
+        #     tta_preds = recombine_tiles(tile_preds, (h, w), TILE_SIZE, tiles_in_x=tiles_in_x, tiles_in_y=tiles_in_y)
+        #     # if verbose and batch_idx == 0:
+        #     #     show_image_pred(tta_img[0].cpu(), F.sigmoid(tta_preds[0]).cpu(), mask=tta_fn(masks.unsqueeze(1))[0][0].cpu())
+        #     # preds += torch.flip(tta_fn(tta_preds), dims=[3])
+        #     # s_pred = recombine_tiles(s_tile_preds, (s_h, s_w), TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+        #     # s_pred = tta_fn(s_pred)
+        #     # preds += F.interpolate(s_pred, size=(h, w), mode='bilinear', align_corners=False)
             
-            preds += tta_fn(tta_preds)
-                
-        preds /= len(tta_lambdas)
+        #     preds += tta_fn(tta_preds)
+        #     pred_list.append(tta_fn(tta_preds).cpu().numpy()[0][0])
+        
+        # # if verbose and batch_idx == 0:
+        # #     plot_list(pred_list)
+        # preds /= len(tta_lambdas)
 
-        preds = torch.sigmoid(preds) # make sure the predictions are between 0 and 1
-        preds = (preds>PREDICTION_THRESHOLD).double() # threshold the predictions
-        # preds = (nn.Sigmoid()(preds)>PREDICTION_THRESHOLD).double()
-        preds = preds.cpu().numpy().astype(np.uint8)
+        # preds = torch.sigmoid(preds) # make sure the predictions are between 0 and 1
+        # preds = (preds>PREDICTION_THRESHOLD).double() # threshold the predictions
+        # # preds = (nn.Sigmoid()(preds)>PREDICTION_THRESHOLD).double()
+        # preds = preds.cpu().numpy().astype(np.uint8)
         
         for i, pred in enumerate(preds):
             # true_mask = preprocess_mask(ls_masks[batch_idx*BATCH_SIZE+i])
@@ -140,14 +148,19 @@ def main():
 
     model_512 = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
     load_checkpoint(torch.load('checkpoints/big_train.pth.tar'), model_512)
-    model_1024 = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
-    load_checkpoint(torch.load('checkpoints/1024_model.pth.tar'), model_1024)
-    models = [model_512, model_1024]
-    sizes = [512, 1024]
+    
+    # model_1024 = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
+    # load_checkpoint(torch.load('checkpoints/1024_model.pth.tar'), model_1024)
+    
+    # model_256 = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
+    # load_checkpoint(torch.load('checkpoints/256_model.pth.tar'), model_256)
+    
+    # models = [model_512, model_1024]
+    # sizes = [512, 1024]
 
     surface_dice_score = local_surface_dice(model_512, device, dataset_folder=VAL_DATASET_DIR, 
-                                            sub_data_idxs=(500, 515), verbose=True)
-    # surface_dice_score = local_surface_dice_multiscale(models, sizes, device, dataset_folder=VAL_DATASET_DIR, 
+                                            sub_data_idxs=(950, 1000), verbose=True)
+    # surface_dice_score = local_surface_dice_multiscale([model_256], [256], device, dataset_folder=VAL_DATASET_DIR, 
     #                                         sub_data_idxs=(500, 515), verbose=True)
 
     print(f'Surface Dice Score: {surface_dice_score:.4f}')

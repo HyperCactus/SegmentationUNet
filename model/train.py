@@ -9,8 +9,8 @@ import matplotlib.pyplot as plt
 import torch.nn.functional as F
 from tqdm import tqdm
 from modules import ImprovedUNet
-from dataset import VAL_LOADER, TRAIN_LOADER, create_loader, augment_image, \
-    preprocess_image, preprocess_mask # TRAIN_TRANSFORMS
+from dataset import preprocess_image, preprocess_mask
+from volumetric_dataset2 import TRAIN_LOADER, VAL_LOADER, create_loader
 import time
 from utils import *
 from glob import glob
@@ -67,7 +67,7 @@ Noise Multiplier: {NOISE_MULTIPLIER}', 0)
 STEP = 0
 
 def train_epoch(loader, model, optimizer, loss_fn, scaler, losses, 
-                accuracies=None, check_memory=check_memory, variances=[], loop=None, epoch=0):
+                accuracies=None, check_memory=check_memory, variances=[], epoch=0):
     """Trains the model for one epoch
 
     Args:
@@ -79,16 +79,12 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         losses (list): The list to store the losses
         accuracies (list): The train accuracies for plotting
     """
-    # eval = BinaryDiceScore()
-    this_loop = tqdm(loader) if loop is None else loader
-    loop = this_loop if loop is None else loop
-    loop.set_description('Training')
-    length = len(loader)
-    # loop = loader
-    for batch_idx, (data, targets) in enumerate(this_loop):
-        # this is for training to identify large ateries and veins
-        if torch.sum(targets) > 10000 and np.random.random() > 0.5:
-            continue
+    loop =  tqdm(loader)
+    loop.set_description(f'Training ep {epoch+1}/{NUM_EPOCHS}')
+    for batch_idx, (data, targets) in enumerate(loop):
+        # # this is for training to identify large ateries and veins
+        # if torch.sum(targets) > 10000 and np.random.random() > 0.5:
+        #     continue
         
         data = data.to(device=device)
         targets = targets.float().unsqueeze(1).to(device=device)
@@ -150,7 +146,7 @@ def train():
     # loss_fn = IoULoss(smooth=1) # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     # loss_fn = IoUDiceLoss() # Testing this loss function
-    loss_fn = CustomFocalLoss(alpha=0.1, gamma=5.0)
+    loss_fn = CustomFocalLoss(alpha=0.2, gamma=3.0)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus
@@ -168,19 +164,19 @@ def train():
     epoch_losses = [] # average loss for each epoch
     train_surface_dice_scores = [] # for plotting
     epoch_variances = [] # average loss variance for each epoch
-    
+        
     model.train()
     check_memory = True
     # Training loop
     start_time = time.time()
-    loop = tqdm(range(NUM_EPOCHS))
-    for epoch in loop:
+    # loop = tqdm(range(NUM_EPOCHS))
+    for epoch in range(NUM_EPOCHS):
         train_epoch_losses = [] # train losses for the epoch
         train_epoch_variances = [] # train loss variance for the epoch
         # Train the model for one epoch
         train_epoch(TRAIN_LOADER, model, optimizer, loss_fn, scaler, 
                     train_epoch_losses, check_memory=check_memory, 
-                    variances=train_epoch_variances, loop=loop, epoch=epoch)
+                    variances=train_epoch_variances, epoch=epoch)
         check_memory = False
         
         # Calculate the average loss for the epoch
@@ -209,14 +205,14 @@ def train():
         n_images = len(glob(os.path.join(VAL_IMG_DIR, '*'+IMG_FILE_EXT)))
         
         if HPC:
-            loop.set_description('Validating')
+            # loop.set_description('Validating')
             subvol_depth = 500 if HPC else 1
             subvol_start = np.random.randint(0, n_images-subvol_depth)
             sub_data_idxs = (subvol_start, subvol_start+subvol_depth)
             val_dice_score = validate(model, device=device, dataset_folder=VAL_DATASET_DIR, 
                                     sub_data_idxs=sub_data_idxs, verbose=False)
             val_dice_score = np.round(val_dice_score, 4)
-            loop.set_description(f'VAL SDC: {val_dice_score}')
+            # loop.set_description(f'VAL SDC: {val_dice_score}')
             
             dice_scores.append(val_dice_score)
             writer.add_scalar('val_dice_score', val_dice_score, epoch)

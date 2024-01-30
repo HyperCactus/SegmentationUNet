@@ -809,8 +809,8 @@ def test_fn():
 
 def inference_fn(model, img:torch.Tensor, 
                  tta_lambdas='flips', device='cuda',
-                 tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y, tile_size=TILE_SIZE,
-                 noise_amount=0, pred_threshold=PREDICTION_THRESHOLD):
+                 tile_size=TILE_SIZE,
+                 noise_amount=NOISE_MULTIPLIER, pred_threshold=PREDICTION_THRESHOLD):
     # add noise to the image
     noise = torch.randn_like(img) * noise_amount
     img = img + noise
@@ -819,6 +819,8 @@ def inference_fn(model, img:torch.Tensor,
     model = model.to(device)
     
     b, c, h, w = img.shape
+    
+    tiles_in_x, tiles_in_y = get_tile_nums(h, w, tile_size, min_overlap=0.5)
     
     preds = torch.zeros((b, 1, h, w), dtype=torch.float32, device=device)
     
@@ -839,7 +841,7 @@ def inference_fn(model, img:torch.Tensor,
         with torch.no_grad():
             tile_preds = [model(tile) for tile in tiles]
             
-        tta_preds = recombine_tiles(tile_preds, (h, w), TILE_SIZE, tiles_in_x=TILES_IN_X, tiles_in_y=TILES_IN_Y)
+        tta_preds = recombine_tiles(tile_preds, (h, w), TILE_SIZE, tiles_in_x=tiles_in_x, tiles_in_y=tiles_in_y)
         preds += tta_fn(tta_preds)
             
     preds /= len(tta_lambdas)
@@ -1067,3 +1069,15 @@ def local_surface_dice_multiscale(models, sizes, device, dataset_folder="/data/t
     true_masks = true_masks.numpy()
     surface_dice_3d = fast_compute_surface_dice_score_from_tensor(three_d_preds, true_masks)
     return surface_dice_3d#mean_surface_dice_score
+
+
+def plot_list(images, n_cols=4):
+    """
+    Plots a list of images
+    """
+    n_rows = math.ceil(len(images)/n_cols)
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(20, 10*n_rows))
+    for i, img in enumerate(images):
+        axs[i].imshow(img)
+        axs[i].axis('off')
+    plt.show()

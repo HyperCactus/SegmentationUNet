@@ -87,8 +87,6 @@ class BinaryDiceLoss(nn.Module):
         self.reduction = reduction
 
     def forward(self, predict, target):
-        print(f' ASSERT {predict.shape[0] == target.shape[0]} IS TRUE')
-        print(f' predict shape: {predict.shape[0]}, target shape: {target.shape[0]}')
         assert predict.shape[0] == target.shape[0], "predict & target batch size don't match"
         predict = predict.contiguous().view(predict.shape[0], -1)
         target = target.contiguous().view(target.shape[0], -1)
@@ -130,12 +128,14 @@ class CustomFocalLoss(nn.Module):
         self.alpha = alpha
         self.gamma = gamma
         self.iou = IoULoss()
+        self.dice_loss = BinaryDiceLoss()
 
     def forward(self, inputs, targets):
         # inputs = torch.sigmoid(inputs)
-        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
+        # BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
+        Dice_loss = self.dice_loss(inputs, targets)
         IoU_loss = self.iou(inputs, targets)
-        l = 0.9*IoU_loss + 0.1*BCE_loss
+        l = 0.9*IoU_loss + 0.1*Dice_loss
         pt = torch.exp(-l)  # prevents nans when probability 0
         F_loss = self.alpha * (1 - pt) ** self.gamma * l
         return F_loss.mean()
