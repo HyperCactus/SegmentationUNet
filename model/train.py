@@ -86,8 +86,8 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         # if torch.sum(targets) > 10000 and np.random.random() > 0.5:
         #     continue
         
-        data = data.to(device=device)
-        targets = targets.float().to(device=device)
+        data = data.squeeze(1).to(device=device)
+        targets = targets.float().unsqueeze(1).to(device=device)
         
         # if not TEST_MODE:
         noise = torch.randn_like(data) * NOISE_MULTIPLIER
