@@ -16,15 +16,18 @@ from glob import glob
 from global_params import *
 
 class VolumetricDataset(Dataset):
-    def __init__(self, images_path, masks_path, volume_size=(TILE_SIZE, TILE_SIZE, TILE_SIZE),
+    def __init__(self, images_path, masks_path, 
+                 volume_size=(TILE_SIZE, TILE_SIZE, TILE_SIZE),
                  transforms_2D=None, transforms_3D=None,
-                 img_file_ext=IMG_FILE_EXT, mask_file_ext=MASK_FILE_EXT, sub_data_idxs=None):
+                 img_file_ext=IMG_FILE_EXT, mask_file_ext=MASK_FILE_EXT, 
+                 subvol_start_pos='random'):
         
         self.volume_size = volume_size
         self.msk_ext = mask_file_ext
         self.img_ext = img_file_ext
         self.transforms_2D = transforms_2D
         self.transforms_3D = transforms_3D
+        self.subvol_start_pos = subvol_start_pos
         
         self.images_paths = [images_path] if isinstance(images_path, str) else images_path
         self.masks_paths = [masks_path] if isinstance(masks_path, str) else masks_path
@@ -41,7 +44,8 @@ class VolumetricDataset(Dataset):
         image_path = self.images_paths[kidney_idx]
         mask_path = self.masks_paths[kidney_idx]
         image, mask = load_random_volume(image_path, mask_path, vol_shape=self.volume_size, 
-                                         img_file_ext=self.img_ext, msk_file_ext=self.msk_ext)
+                                        img_file_ext=self.img_ext, msk_file_ext=self.msk_ext,
+                                        start_pos=self.subvol_start_pos)
         
         if self.transforms_3D is not None:
             image, mask = self.transforms_3D(image, mask)
@@ -98,6 +102,7 @@ class VolumetricDataset(Dataset):
         self.count += 1
         
         image, mask = self._transform_2D(image, mask)
+        image = image.unsqueeze(0) # Add channel dimension
         return image, mask
 
 def normalize_image(image):
@@ -108,12 +113,14 @@ def normalize_image(image):
     return image
 
 def load_random_volume(img_path, mask_path, vol_shape=(TILE_SIZE, TILE_SIZE, TILE_SIZE), 
-                       img_file_ext=IMG_FILE_EXT, msk_file_ext=MASK_FILE_EXT):
+                       img_file_ext=IMG_FILE_EXT, msk_file_ext=MASK_FILE_EXT, start_pos='random'):
     """Loads a random volume from a series of image files.
 
     Args:
         path (str or os path like): Path to image slices directory.
         vol_shape (tuple, optional): Desired volume shape. Defaults to (TILE_SIZE, TILE_SIZE, TILE_SIZE).
+        start_pos (tuple(int, int, int), optional): Bottom, left, closest corner of the volume (h, w, d) or 
+                                                    (x, y, z). Defaults to 'random'.
     Returns:
         vol (torch.Tensor): A random 3D volume of shape (H, W, D), with one channel.
     """
@@ -125,9 +132,18 @@ def load_random_volume(img_path, mask_path, vol_shape=(TILE_SIZE, TILE_SIZE, TIL
     orig_h, orig_w = cv2.imread(img_dirs[0]).shape[:2]
     orig_d = len(img_dirs)
     
-    x_start = 0 if orig_w-w <= 0 else np.random.randint(0, orig_w - w)
-    y_start = 0 if orig_h-h <= 0 else np.random.randint(0, orig_h - h)
-    z_start = 0 if orig_d-d <= 0 else np.random.randint(0, orig_d - d)
+    if start_pos == 'random':
+        x_start = 0 if orig_w-w <= 0 else np.random.randint(0, orig_w - w)
+        y_start = 0 if orig_h-h <= 0 else np.random.randint(0, orig_h - h)
+        z_start = 0 if orig_d-d <= 0 else np.random.randint(0, orig_d - d)
+    elif start_pos == 'center':
+        x_start = 0 if orig_w-w <= 0 else (orig_w - w) // 2
+        y_start = 0 if orig_h-h <= 0 else (orig_h - h) // 2
+        z_start = 0 if orig_d-d <= 0 else (orig_d - d) // 2
+    elif type(start_pos) == type((1, 2, 3)):
+        x_start, y_start, z_start = start_pos
+    else:
+        raise Exception(f'Invalid start position: {start_pos}')
     
     x_end = x_start + w if x_start + w < orig_w else orig_w
     y_end = y_start + h if y_start + h < orig_h else orig_h
@@ -182,12 +198,14 @@ transform = A.Compose([
 
 
 def create_loader(image_files, mask_files, batch_size, 
-                  transform_2d=None, transform_3d=None, shuffle=False, tile_size=TILE_SIZE):
-    
-    dataset = VolumetricDataset(image_files, mask_files, volume_size=(tile_size,tile_size,tile_size), transforms_2D=transform_2d, transforms_3D=transform_3d)
+                  transform_2d=None, transform_3d=None, shuffle=False, 
+                  tile_size=TILE_SIZE, subvol_start_pos='center'):
+    dataset = VolumetricDataset(image_files, mask_files, volume_size=(tile_size,tile_size,tile_size), 
+                                transforms_2D=transform_2d, transforms_3D=transform_3d,
+                                subvol_start_pos=subvol_start_pos)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
-VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, shuffle=False)
+VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, shuffle=False, subvol_start_pos='center')
 
 image_dirs = []
 mask_dirs = []
@@ -195,17 +213,17 @@ for kidney in TRAIN_DATASETS:
     image_dirs.append(os.path.join(BASE_PATH, kidney, 'images'))
     mask_dirs.append(os.path.join(BASE_PATH, kidney, 'labels'))
 
-TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE, 
-                            transform_2d=transform, shuffle=True)
+# TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE, 
+#                             transform_2d=transform, shuffle=True)
 
 
-test_mode = True
+test_mode = False#True
 # print(len(kidney_1_voi_loader))
 
 if test_mode:
     # testing the dataset:
-    for batch_idx, (batch_images, batch_masks) in enumerate(TRAIN_LOADER):
-        print(f"Batch {batch_idx+1} of {len(TRAIN_LOADER)}")
+    for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
+        print(f"Batch {batch_idx+1} of {len(VAL_LOADER)}")
         print("Image batch shape:", batch_images.shape)
         print("Mask batch shape:", batch_masks.shape)
         
@@ -214,8 +232,8 @@ if test_mode:
             image = image + noise
             image = image.squeeze()
             print(f'image.shape: {image.shape}')
-            image = (image*255).numpy().astype('uint8')
-            mask = (mask*255).numpy().astype('uint8')            
+            # image = (image*255).numpy().astype('uint8')
+            # mask = (mask*255).numpy().astype('uint8')            
             plt.figure(figsize=(10, 5))
             
             plt.subplot(1, 2, 1)

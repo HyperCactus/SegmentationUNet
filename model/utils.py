@@ -691,8 +691,8 @@ def recombine_tiles(tiles, original_size, tile_size, tiles_in_x, tiles_in_y):
     for i in range(tiles_in_y):
         for j in range(tiles_in_x):
             # Calculate start coordinates for the tile
-            start_x = j * (tile_size - (tile_size * tiles_in_x - original_width) // (tiles_in_x - 1))
-            start_y = i * (tile_size - (tile_size * tiles_in_y - original_height) // (tiles_in_y - 1))
+            start_x = 0 if tiles_in_x == 1 else j * (tile_size - (tile_size * tiles_in_x - original_width) // (tiles_in_x - 1))
+            start_y = 0 if tiles_in_y == 1 else i * (tile_size - (tile_size * tiles_in_y - original_height) // (tiles_in_y - 1))
             end_x = min(start_x + tile_size, original_width)
             end_y = min(start_y + tile_size, original_height)
 
@@ -808,20 +808,14 @@ def test_fn():
 
 
 def inference_fn(model, img:torch.Tensor, 
-                 tta_lambdas='flips', device='cuda',
-                 tile_size=TILE_SIZE,
+                 tta_lambdas='flips', device='cuda', tile_size=TILE_SIZE,
                  noise_amount=NOISE_MULTIPLIER, pred_threshold=PREDICTION_THRESHOLD):
-    # add noise to the image
     noise = torch.randn_like(img) * noise_amount
-    img = img + noise
-    
+    img = img + noise # add noise to the image
     img = img.to(device)
     model = model.to(device)
-    
     b, c, h, w = img.shape
-    
-    tiles_in_x, tiles_in_y = get_tile_nums(h, w, tile_size, min_overlap=0.5)
-    
+    tiles_in_x, tiles_in_y = get_tile_nums(h, w, tile_size, min_overlap=0.5)    
     preds = torch.zeros((b, 1, h, w), dtype=torch.float32, device=device)
     
     if tta_lambdas == 'flips':
@@ -846,9 +840,9 @@ def inference_fn(model, img:torch.Tensor,
             
     preds /= len(tta_lambdas)
 
-    preds = (nn.Sigmoid()(preds)>pred_threshold).double()
-    preds = preds.cpu().numpy().astype(np.uint8)
-    return preds
+    preds = (torch.sigmoid_(preds)>pred_threshold).double()
+    # preds = preds.cpu().numpy().astype(np.uint8)
+    return preds.cpu()
 
 
 def plot_examples(model, num=5, device='cuda', 
@@ -863,6 +857,7 @@ def plot_examples(model, num=5, device='cuda',
 
     if sub_data_idxs is not None:
         start, end = sub_data_idxs
+        assert end <= len(img_paths), f'end index {end} out of range. There are {len(img_paths)} images.'
         img_paths = img_paths[start:end]
         mask_paths = mask_paths[start:end]
     

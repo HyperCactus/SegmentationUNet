@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from modules import ImprovedUNet
 from dataset import preprocess_image, preprocess_mask
-from volumetric_dataset2 import TRAIN_LOADER, VAL_LOADER, create_loader
+from volumetric_dataset2 import TRAIN_LOADER, create_loader
 import time
 from utils import *
 from glob import glob
@@ -146,7 +146,7 @@ def train():
     # loss_fn = IoULoss(smooth=1) # Testing this loss function
     # loss_fn = BlackToWhiteRatioLoss() # Testing this loss function
     # loss_fn = IoUDiceLoss() # Testing this loss function
-    loss_fn = CustomFocalLoss(alpha=0.2, gamma=3.0)
+    loss_fn = CustomFocalLoss(alpha=0.2, gamma=4.0)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE) # Adam optimizer
     # This learning rate scheduler reduces the learning rate by a factor of 0.1 if the mean epoch loss plateaus
@@ -193,26 +193,24 @@ def train():
         if not TEST_MODE:
             plot_examples(model, num=5, device=device, 
                         dataset_folder=VAL_DATASET_DIR, 
-                        sub_data_idxs=(500, 1400), save=True,
-                        save_dir=f'saved_images/epoch_{epoch+1}_examples.png', show=False)
+                        save=True, save_dir=f'saved_images/epoch_{epoch+1}_examples.png', 
+                        show=False)
             # read the image with PIL and convert to numpy array
             img = torch.tensor(cv2.imread(f'saved_images/epoch_{epoch+1}_examples.png')).permute(2, 0, 1).float() / 255.0
             writer.add_image('example_predictions', img, epoch)
         
         # Calculate the validation dice score after each epoch
-        # val_dice_score = evaluate(model, VAL_LOADER, device=device, verbose=True, leave_on_train=True)
         # select a random subvolume from the validation dataset
         n_images = len(glob(os.path.join(VAL_IMG_DIR, '*'+IMG_FILE_EXT)))
         
-        if HPC:
+        if not TEST_MODE:
             # loop.set_description('Validating')
-            subvol_depth = 500 if HPC else 1
-            subvol_start = np.random.randint(0, n_images-subvol_depth)
-            sub_data_idxs = (subvol_start, subvol_start+subvol_depth)
+            # subvol_depth = 500 if HPC else 1
+            # subvol_start = np.random.randint(0, n_images-subvol_depth)
+            # sub_data_idxs = (subvol_start, subvol_start+subvol_depth)
             val_dice_score = validate(model, device=device, dataset_folder=VAL_DATASET_DIR, 
-                                    sub_data_idxs=sub_data_idxs, verbose=False)
+                                    verbose=False)
             val_dice_score = np.round(val_dice_score, 4)
-            # loop.set_description(f'VAL SDC: {val_dice_score}')
             
             dice_scores.append(val_dice_score)
             writer.add_scalar('val_dice_score', val_dice_score, epoch)
@@ -222,10 +220,10 @@ def train():
             print(f'Epoch loss variance: {epoch_variances[-1]:.4f}')
             print(f'Actual Learning Rate: {optimizer.param_groups[0]["lr"]:.4e}')
         
-        if epoch == NUM_EPOCHS-1 and HPC and NUM_EPOCHS > 8:
-            # validate on full validation dataset
-            ful_val_score = validate(model, device=device, dataset_folder=VAL_DATASET_DIR)
-            print(f'Full validation 3D Surface Dice Score: {ful_val_score}')
+        # if epoch == NUM_EPOCHS-1 and HPC and NUM_EPOCHS > 8:
+        #     # validate on full validation dataset
+        #     ful_val_score = validate(model, device=device, dataset_folder=VAL_DATASET_DIR)
+        #     print(f'Full validation 3D Surface Dice Score: {ful_val_score}')
             
         # Print some feedback after each epoch
         print_progress(start_time, epoch, NUM_EPOCHS)
@@ -236,7 +234,10 @@ def train():
             os.makedirs(f'epoch_data/epoch_{epoch}', exist_ok=True)
             os.makedirs(f'epoch_data/epoch_{epoch}/checkpoints', exist_ok=True)
             os.makedirs(f'epoch_data/epoch_{epoch}/images', exist_ok=True)
-            save_predictions_as_imgs(VAL_LOADER, model, 10, folder=f'epoch_data/epoch_{epoch}/images/', device=device)
+            plot_examples(model, num=5, device=device, 
+                        dataset_folder=VAL_DATASET_DIR, 
+                        save=True, save_dir=f'epoch_data/epoch_{epoch}/images/examples.png', 
+                        show=False)
             # Save a checkpoint after each epoch
             checkpoint = {
                 'state_dict': model.state_dict(),
@@ -250,8 +251,6 @@ def train():
         'optimizer': optimizer.state_dict()
     }
     save_checkpoint(checkpoint)
-    
-    # evaluate_fn()
         
     # Plot the losses
     plt.figure(figsize=(20, 10))
@@ -285,17 +284,6 @@ def train():
     plt.savefig('save_data/dice_scores.png')
     if not HPC and not TEST_MODE:
         plt.show()
-
-    # # plot loss variance vs epoch
-    # plt.figure(figsize=(20, 10))
-    # plt.plot(epoch_variances, label='Loss Variance')
-    # plt.xlabel('Epoch #')
-    # plt.ylabel('Train Loss Variance')
-    # plt.title('Average Loss Variance per Epoch')
-    # plt.grid(True)
-    # plt.savefig('save_data/epoch_variances.png')
-    # if not HPC and not TEST_MODE:
-    #     plt.show()
 
     finish_time = time.time()
     # convert time to hours, minutes, seconds

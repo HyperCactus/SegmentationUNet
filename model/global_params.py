@@ -2,19 +2,19 @@
 Global parameters for the UNet model defined here for easy access across files.
 """
 
-HPC = False#True
+HPC = True
 PNG_DSET = True
 TEST_MODE = False#not HPC
 
 # Hyperparameters
 # LEARNING_RATE = 1e-4
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-5
 BATCH_SIZE = 32 if HPC else 4#16
 # BATCH_SIZE = 3 # Laptop
-NUM_EPOCHS = 30 if HPC else 15
+NUM_EPOCHS = 200 if HPC else 15
 NUM_WORKERS = 4
 PIN_MEMORY = True
-PREDICTION_THRESHOLD = 0.6125#0.5
+PREDICTION_THRESHOLD = 0.51
 IN_CHANNELS = 1 # I've stacked the previous image, current image, and next image as the input channels
 
 IMAGE_HEIGHT = 256
@@ -33,14 +33,15 @@ TILE_SIZE = 512#256
 # CHECKPOINT_DIR = 'checkpoints/IoU_loss_15ep.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/big_train.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/1024_model.pth.tar'
-CHECKPOINT_DIR = 'checkpoints/256_model.pth.tar'
+# CHECKPOINT_DIR = 'checkpoints/256_model.pth.tar'
+CHECKPOINT_DIR = 'checkpoints/512_vol_train.pth.tar'
 
 if PNG_DSET:
     BASE_PATH = 'data_png/train'
 else:
     BASE_PATH = 'data_downsampled512/train' if HPC else 'data/train'
 
-VAL_DATASET_DIR = BASE_PATH + '/kidney_2'
+VAL_DATASET_DIR = BASE_PATH + '/kidney_3_dense'
 VAL_IMG_DIR = VAL_DATASET_DIR + '/images'
 VAL_MASK_DIR = VAL_DATASET_DIR + '/labels'
 
@@ -53,4 +54,4 @@ NOISE_MULTIPLIER = 0.0 if TEST_MODE else 0.01
 # base_path = 'data_downsampled512/train'
 # dataset = 'kidney_1_dense'
 datasets = ['kidney_1_dense', 'kidney_1_voi', 'kidney_2', 'kidney_3_sparse']
-TRAIN_DATASETS = ['kidney_1_dense', 'kidney_3_dense']
+TRAIN_DATASETS = ['kidney_1_dense']
