@@ -203,13 +203,13 @@ def train():
         # select a random subvolume from the validation dataset
         n_images = len(glob(os.path.join(VAL_IMG_DIR, '*'+IMG_FILE_EXT)))
         
-        if not TEST_MODE:
+        if not TEST_MODE and (epoch+1) % 5 == 0:
             # loop.set_description('Validating')
             # subvol_depth = 500 if HPC else 1
             # subvol_start = np.random.randint(0, n_images-subvol_depth)
             # sub_data_idxs = (subvol_start, subvol_start+subvol_depth)
             val_dice_score = validate(model, device=device, dataset_folder=VAL_DATASET_DIR, 
-                                    verbose=False)
+                                    verbose=False, fast_mode=False)
             val_dice_score = np.round(val_dice_score, 4)
             
             dice_scores.append(val_dice_score)

@@ -9,7 +9,9 @@ from torch.optim.lr_scheduler import _LRScheduler
 from typing import List, cast
 import numpy as np
 from utils import one_hot2hd_dist, probs2one_hot, simplex, one_hot
-from global_params import PREDICTION_THRESHOLD
+from global_params import PREDICTION_THRESHOLD, TILE_SIZE
+from helper import fast_compute_surface_dice_score_from_tensor
+
 
 
 # Intersection over Union (IoU) loss
@@ -132,13 +134,83 @@ class CustomFocalLoss(nn.Module):
 
     def forward(self, inputs, targets):
         # inputs = torch.sigmoid(inputs)
-        # BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
+        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
         Dice_loss = self.dice_loss(inputs, targets)
         IoU_loss = self.iou(inputs, targets)
-        l = 0.9*IoU_loss + 0.1*Dice_loss
+        l = 0.9*IoU_loss + 0.1*Dice_loss + BCE_loss
         pt = torch.exp(-l)  # prevents nans when probability 0
         F_loss = self.alpha * (1 - pt) ** self.gamma * l
         return F_loss.mean()
+
+
+
+class NeuralLoss(nn.Module):
+    """Loss function that predicts the surface dice score for the prediction
+    """
+    def __init__(self, image_size=TILE_SIZE):
+        super(NeuralLoss, self).__init__()
+        self.size = image_size
+        self.network = nn.Sequential( # input size is self.size x self.size x 2 (prediction and target)
+            nn.Conv2d(2, 4, kernel_size=3, padding=1), # 1st conv block
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Conv2d(4, 8, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Conv2d(8, 16, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.InstanceNorm2d(16),
+            nn.MaxPool2d(kernel_size=2, stride=2), # now self.size/2 x self.size/2, 16 feature maps
+            nn.Conv2d(16, 32, kernel_size=3, padding=1), # 2nd conv block
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.InstanceNorm2d(128),
+            nn.MaxPool2d(kernel_size=2, stride=2), # now self.size/4 x self.size/4, 128 feature maps
+            nn.Flatten(), # now dense layers
+            nn.Linear(128 * (self.size//4) * (self.size//4), 1024),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Linear(512, 1),
+            nn.Sigmoid() # output is a single number between 0 and 1 (predicted surface dice score)
+        )
+        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=1e-3)
+    
+    def _train_loss(self, predicted_sdc, real_sdc):
+        """Calculate the loss for training"""
+        return torch.abs(predicted_sdc - real_sdc)^2
+        
+    def forward(self, prediction, targets, train=True):
+        """Every forward pass of this loss function will train the neural network, unless train=False"""
+        
+        predicted_sdc = self.network(torch.cat((prediction, targets), dim=1))
+        
+        if train:
+            real_surface_dice = fast_compute_surface_dice_score_from_tensor(targets.cpu().numpy(), prediction.cpu().numpy())
+            loss = self._train_loss(predicted_sdc, real_surface_dice)
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            
+        return predicted_sdc
+
+# def test_neural_loss():
+#     """Test the NeuralLoss class"""
+#     loss = NeuralLoss()
+#     print(loss(torch.rand((1, 1, 512, 512)), torch.rand((1, 1, 512, 512))))
+    
+# if __name__ == '__main__':
+#     test_neural_loss()
+
+
+
+
+
+
+
+
+
 
 ###############################################################################
 # following from: https://github.com/sunfan-bvb/BoundaryDoULoss/blob/main/TransUNet/utils.py
