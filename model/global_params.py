@@ -2,16 +2,16 @@
 Global parameters for the UNet model defined here for easy access across files.
 """
 
-HPC = False#True
+HPC = True
 PNG_DSET = True
 TEST_MODE = False#not HPC
 
 # Hyperparameters
 # LEARNING_RATE = 1e-4
 LEARNING_RATE = 1e-5
-BATCH_SIZE = 32 if HPC else 4#16
+BATCH_SIZE = 8 if HPC else 16
 # BATCH_SIZE = 3 # Laptop
-NUM_EPOCHS = 30 if HPC else 15
+NUM_EPOCHS = 30 if HPC else 2
 NUM_WORKERS = 4
 PIN_MEMORY = True
 PREDICTION_THRESHOLD = 0.53
@@ -26,7 +26,7 @@ HIGH_PASS_STRENGTH = 0.1
 TILES_IN_X = 12#4
 TILES_IN_Y = 9#3
 
-TILE_SIZE = 512#256
+TILE_SIZE = 256 if HPC else 32#64
 
 CHECKPOINT_DIR = 'checkpoints/checkpoint.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/in_chans3.pth.tar'

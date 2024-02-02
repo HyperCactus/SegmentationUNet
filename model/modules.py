@@ -1,7 +1,7 @@
 """
 A CNN model based on the Improved UNet architecture, with associated modules.
 """
-# This is my 2D UNet from COMP3710
+# This is my 3d UNet from COMP3710
 
 import torch
 import torch.nn as nn
@@ -21,12 +21,12 @@ class ContextModule(nn.Module):
         Initialize the ContextModule.
         """
         super(ContextModule, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        self.norm1 = nn.InstanceNorm2d(out_channels)
+        self.conv1 = nn.Conv3d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.norm1 = nn.InstanceNorm3d(out_channels)
         self.relu1 = nn.LeakyReLU(negative_slope=1e-2)
-        self.dropout = nn.Dropout2d(p=0.0)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
-        self.norm2 = nn.InstanceNorm2d(out_channels)
+        self.dropout = nn.Dropout3d(p=0.0)
+        self.conv2 = nn.Conv3d(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
+        self.norm2 = nn.InstanceNorm3d(out_channels)
         self.relu2 = nn.LeakyReLU(negative_slope=1e-2)
         
     def forward(self, x):
@@ -55,8 +55,8 @@ class LocalisationModule(nn.Module):
         """
         super(LocalisationModule, self).__init__()
         # self.upsample = nn.Upsample(scale_factor=2, mode='nearest')
-        self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        self.conv1 = nn.Conv3d(in_channels, in_channels, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv3d(in_channels, out_channels, kernel_size=1)
     
     def forward(self, x):
         """
@@ -79,7 +79,7 @@ class UpsamplingModule(nn.Module):
         super(UpsamplingModule, self).__init__()
         self.layers = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='nearest'),
-            nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
+            nn.Conv3d(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
         )
         
     def forward(self, x):
@@ -101,18 +101,18 @@ class AttentionBlock(nn.Module):
         super(AttentionBlock, self).__init__()
 
         self.W_gate = nn.Sequential(
-            nn.Conv2d(F_g, n_coefficients, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.BatchNorm2d(n_coefficients)
+            nn.Conv3d(F_g, n_coefficients, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm3d(n_coefficients)
         )
 
         self.W_x = nn.Sequential(
-            nn.Conv2d(F_l, n_coefficients, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.BatchNorm2d(n_coefficients)
+            nn.Conv3d(F_l, n_coefficients, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm3d(n_coefficients)
         )
 
         self.psi = nn.Sequential(
-            nn.Conv2d(n_coefficients, 1, kernel_size=1, stride=1, padding=0, bias=True),
-            nn.BatchNorm2d(1),
+            nn.Conv3d(n_coefficients, 1, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm3d(1),
             nn.Sigmoid()
         )
 
@@ -158,27 +158,27 @@ class ImprovedUNet(nn.Module):
         """
         super(ImprovedUNet, self).__init__()
         self.encoder_block1 = nn.Sequential(
-            nn.Conv2d(in_channels, features[0], kernel_size=3, stride=1, padding=1),
+            nn.Conv3d(in_channels, features[0], kernel_size=3, stride=1, padding=1),
             nn.LeakyReLU(negative_slope=1e-2),
             ContextModule(features[0], features[0]), # 3 channels in, 16 channels out
         )
         self.encoder_block2 = nn.Sequential(
-            nn.Conv2d(features[0], features[1], kernel_size=3, stride=2, padding=1),
+            nn.Conv3d(features[0], features[1], kernel_size=3, stride=2, padding=1),
             nn.LeakyReLU(negative_slope=1e-2),
             ContextModule(features[1], features[1]), # 16 channels in, 32 channels out
         )
         self.encoder_block3 = nn.Sequential(
-            nn.Conv2d(features[1], features[2], kernel_size=3, stride=2, padding=1),
+            nn.Conv3d(features[1], features[2], kernel_size=3, stride=2, padding=1),
             nn.LeakyReLU(negative_slope=1e-2),
             ContextModule(features[2], features[2]), # 32 channels in, 64 channels out
         )
         self.encoder_block4 = nn.Sequential(
-            nn.Conv2d(features[2], features[3], kernel_size=3, stride=2, padding=1),
+            nn.Conv3d(features[2], features[3], kernel_size=3, stride=2, padding=1),
             nn.LeakyReLU(negative_slope=1e-2),
             ContextModule(features[3], features[3]), # 64 channels in, 128 channels out
         )
         self.encoder_block5 = nn.Sequential(
-            nn.Conv2d(features[3], features[4], kernel_size=3, stride=2, padding=1),
+            nn.Conv3d(features[3], features[4], kernel_size=3, stride=2, padding=1),
             nn.LeakyReLU(negative_slope=1e-2),
             ContextModule(features[4], features[4]), # 128 channels in, 256 channels out
             # upsampling module in last encoder block increases spatial dimensions by 2 for decoder
@@ -204,18 +204,18 @@ class ImprovedUNet(nn.Module):
         self.up4 = UpsamplingModule(features[1], features[0]) # 32 channels in, 16 channels out, double spatial dimensions
         self.attention4 = AttentionBlock(features[0], features[0], 256)
         self.final_conv = nn.Sequential(
-            nn.Conv2d(features[1], features[1], kernel_size=1), # 32 channels in, 32 channels out, final convolutional layer
+            nn.Conv3d(features[1], features[1], kernel_size=1), # 32 channels in, 32 channels out, final convolutional layer
             nn.LeakyReLU(negative_slope=1e-2),
-            nn.Conv2d(features[1], features[1], kernel_size=1), # 32 channels in, 32 channels out, final convolutional layer
-            nn.LeakyReLU(negative_slope=1e-2),##
-            nn.Conv2d(features[1], features[1], kernel_size=1), # 32 channels in, 32 channels out, final convolutional layer
-            nn.LeakyReLU(negative_slope=1e-2),##
-            nn.Conv2d(features[1], out_channels, kernel_size=1) # 32 channels in, 1 channel out, segmentation layer
+            # nn.Conv3d(features[1], features[1], kernel_size=1), # 32 channels in, 32 channels out, final convolutional layer
+            # nn.LeakyReLU(negative_slope=1e-2),##
+            # nn.Conv3d(features[1], features[1], kernel_size=1), # 32 channels in, 32 channels out, final convolutional layer
+            # nn.LeakyReLU(negative_slope=1e-2),##
+            nn.Conv3d(features[1], out_channels, kernel_size=1) # 32 channels in, 1 channel out, segmentation layer
         )
         
-        self.segmentation1 = nn.Conv2d(features[2], out_channels, kernel_size=1) # 64 channels in, 1 channels out, segmentation layer
+        self.segmentation1 = nn.Conv3d(features[2], out_channels, kernel_size=1) # 64 channels in, 1 channels out, segmentation layer
         self.upscale1 = nn.Upsample(scale_factor=2, mode='nearest') # upscale the segmentation layer to match the dimensions of the output
-        self.segmentation2 = nn.Conv2d(features[1], out_channels, kernel_size=1) # 32 channels in, 1 channels out, segmentation layer
+        self.segmentation2 = nn.Conv3d(features[1], out_channels, kernel_size=1) # 32 channels in, 1 channels out, segmentation layer
         self.upscale2 = nn.Upsample(scale_factor=2, mode='nearest') # upscale the segmentation layer to match the dimensions of the output
         
     

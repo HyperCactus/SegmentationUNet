@@ -18,7 +18,8 @@ from torch.utils.tensorboard import SummaryWriter
 from costom_loss import CustomFocalLoss, EpicLoss, BlackToWhiteRatioLoss, IoULoss, ReduceLROnThreshold, \
     BinaryDiceLoss, BoundaryDoULoss, IoUDiceLoss
 from global_params import * # Hyperparameters and other global variables
-from evaluate import local_surface_dice as validate
+# from evaluate import local_surface_dice as validate
+from evaluate import evaluate as validate
 from PIL import Image
 import cv2
 
@@ -86,8 +87,8 @@ def train_epoch(loader, model, optimizer, loss_fn, scaler, losses,
         # if torch.sum(targets) > 10000 and np.random.random() > 0.5:
         #     continue
         
-        data = data.squeeze(1).to(device=device)
-        targets = targets.float().unsqueeze(1).to(device=device)
+        data = data.to(device=device)
+        targets = targets.float().to(device=device)
         
         # if not TEST_MODE:
         noise = torch.randn_like(data) * NOISE_MULTIPLIER
@@ -190,26 +191,26 @@ def train():
         # Update the learning rate
         scheduler.step(epoch_losses[-1])
         # scheduler.step(epoch_variances[-1])
-        if not TEST_MODE:
-            plot_examples(model, num=5, device=device, 
-                        dataset_folder=VAL_DATASET_DIR, 
-                        save=True, save_dir=f'saved_images/epoch_{epoch+1}_examples.png', 
-                        show=False)
-            # read the image with PIL and convert to numpy array
-            img = torch.tensor(cv2.imread(f'saved_images/epoch_{epoch+1}_examples.png')).permute(2, 0, 1).float() / 255.0
-            writer.add_image('example_predictions', img, epoch)
+        # if not TEST_MODE:
+        #     plot_examples(model, num=5, device=device, 
+        #                 dataset_folder=VAL_DATASET_DIR, 
+        #                 save=True, save_dir=f'saved_images/epoch_{epoch+1}_examples.png', 
+        #                 show=False)
+        #     # read the image with PIL and convert to numpy array
+        #     img = torch.tensor(cv2.imread(f'saved_images/epoch_{epoch+1}_examples.png')).permute(2, 0, 1).float() / 255.0
+        #     writer.add_image('example_predictions', img, epoch)
         
         # Calculate the validation dice score after each epoch
         # select a random subvolume from the validation dataset
         n_images = len(glob(os.path.join(VAL_IMG_DIR, '*'+IMG_FILE_EXT)))
         
-        if not TEST_MODE and (epoch+1) % 5 == 0:
+        if not TEST_MODE:
             # loop.set_description('Validating')
             # subvol_depth = 500 if HPC else 1
             # subvol_start = np.random.randint(0, n_images-subvol_depth)
             # sub_data_idxs = (subvol_start, subvol_start+subvol_depth)
-            val_dice_score = validate(model, device=device, dataset_folder=VAL_DATASET_DIR, 
-                                    verbose=False, fast_mode=False)
+            val_dice_score = validate(model, device=device,# dataset_folder=VAL_DATASET_DIR, 
+                                    verbose=False)
             val_dice_score = np.round(val_dice_score, 4)
             
             dice_scores.append(val_dice_score)

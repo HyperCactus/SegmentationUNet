@@ -3,8 +3,8 @@ Loads the model and runs it on the test set. Saves the predictions to a folder f
 and calculates the dice score on the test set.
 """
 
-from dataset import UsageDataset, VAL_LOADER, val_transform, create_loader
-from volumetric_dataset2 import create_loader as create_volumetric_loader
+from dataset import UsageDataset, val_transform, create_loader
+from volumetric_dataset2 import create_loader as create_volumetric_loader, VAL_LOADER
 import torch
 from utils import *
 from modules import ImprovedUNet
@@ -19,6 +19,27 @@ from surface_dice import compute_surface_dice_score, add_size_columns
 from global_params import *
 import torch.nn.functional as F
 
+def evaluate(model, device, val_loader=VAL_LOADER, verbose=False):
+    vol = next(iter(val_loader))
+    img_vol, mask_vol = vol
+    img_vol = img_vol.to(device=device, dtype=torch.float)
+    
+    model.eval()
+    with torch.no_grad():
+        preds = model(img_vol)
+    
+    preds = torch.sigmoid(preds)
+    preds = (preds > PREDICTION_THRESHOLD).float()
+    # remove channel dimension
+    preds = preds.squeeze(1).cpu()
+    mask_vol = mask_vol.squeeze(1)
+    
+    sdc = 0
+    for i, pred_vol in enumerate(preds): # Average SDC over a batch of volumes
+        mask = mask_vol[i].cpu().numpy()
+        sdc += fast_compute_surface_dice_score_from_tensor(pred_vol.numpy(), mask)
+    sdc /= len(preds)
+    return sdc
 
 def local_surface_dice(model, device, dataset_folder="/data/train/kidney_2", 
                        sub_data_idxs=None, verbose=False, fast_mode=False):
@@ -165,12 +186,14 @@ def main():
     model_512 = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
     load_checkpoint(torch.load(CHECKPOINT_DIR), model_512)
 
-    surface_dice_score = local_surface_dice(model_512, device, dataset_folder=VAL_DATASET_DIR, 
-                                            verbose=True, fast_mode=False, sub_data_idxs=(0, 15))
+    # surface_dice_score = local_surface_dice(model_512, device, dataset_folder=VAL_DATASET_DIR, 
+    #                                         verbose=True, fast_mode=False, sub_data_idxs=(0, 15))
+    surface_dice_score = evaluate(model_512, device)
 
     print(f'Surface Dice Score: {surface_dice_score:.4f}')
     
-    plot_examples(model_512)
+    # plot_examples(model_512)
+    plot_examples3d(model_512)
 
 if __name__ == '__main__':
     main()

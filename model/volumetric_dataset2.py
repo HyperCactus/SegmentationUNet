@@ -17,15 +17,15 @@ from global_params import *
 
 class VolumetricDataset(Dataset):
     def __init__(self, images_path, masks_path, 
-                 volume_size=(TILE_SIZE, TILE_SIZE, TILE_SIZE),
-                 transforms_2D=None, transforms_3D=None,
-                 img_file_ext=IMG_FILE_EXT, mask_file_ext=MASK_FILE_EXT, 
+                 volume_size=TILE_SIZE,
+                 transforms_3D=None,
+                 img_file_ext=IMG_FILE_EXT, 
+                 mask_file_ext=MASK_FILE_EXT, 
                  subvol_start_pos='random'):
         
         self.volume_size = volume_size
         self.msk_ext = mask_file_ext
         self.img_ext = img_file_ext
-        self.transforms_2D = transforms_2D
         self.transforms_3D = transforms_3D
         self.subvol_start_pos = subvol_start_pos
         
@@ -33,11 +33,7 @@ class VolumetricDataset(Dataset):
         self.masks_paths = [masks_path] if isinstance(masks_path, str) else masks_path
         assert len(images_path) == len(masks_path), \
             f'Number of images and masks do not match. Found {len(images_path)} images and {len(masks_path)} masks.'
-        
-        self.vol_img, self.vol_mask = self._add_volume()
-        self.cur_axis = 0
-        self.count = 0
-    
+            
     def _add_volume(self):
         # randomly select a volume from the dataset
         kidney_idx = np.random.randint(0, len(self.images_paths))
@@ -56,12 +52,6 @@ class VolumetricDataset(Dataset):
         self.vol_img, self.vol_mask = self._add_volume()
         self.cur_axis = 0
         self.count = 0
-    
-    def _transform_2D(self, image, mask):
-        if self.transforms_2D is not None:
-            augmented = self.transforms_2D(image=image.numpy(), mask=mask.numpy())
-            image, mask = augmented['image'], augmented['mask']
-        return image, mask
 
     def __len__(self):
         """Returns the number of slices in the current volume. 
@@ -73,37 +63,15 @@ class VolumetricDataset(Dataset):
         return max(self.volume_size)*3
 
     def __getitem__(self, idx):
-        """Gets a slice from a random volume, slices are taken along the x, y, or z axis.
-
-        Args:
-            idx (int): index.
-        Returns:
-            image (torch.Tensor): A 2D slice of shape (1, H, W).
-            mask (torch.Tensor): A 2D slice of shape (1, H, W).
+        """Returns a mask and image volume of shape (1, H, W, D)
+        where H, W, D = volume_size.
         """
-        h, w, d = self.volume_size
-        if self.count+1 > max(h, w, d)*3:
-            self._reset()
-        # if idx > max(h, w, d):
-        #     self._reset() # reset the volume if we've gone through all the slices
-        if self.cur_axis == 0:
-            idx = idx % w
-            image = self.vol_img[:, :, idx]
-            mask = self.vol_mask[:, :, idx]
-        elif self.cur_axis == 1:
-            idx = idx % h
-            image = self.vol_img[:, idx, :]
-            mask = self.vol_mask[:, idx, :]
-        else:
-            idx = idx % d
-            image = self.vol_img[idx, :, :]
-            mask = self.vol_mask[idx, :, :]
-        self.cur_axis = (self.cur_axis + 1) % 3
-        self.count += 1
-        
-        image, mask = self._transform_2D(image, mask)
-        image = image.unsqueeze(0) # Add channel dimension
-        return image, mask
+        h, w, d = (self.volume_size, self.volume_size, self.volume_size)
+        img_vol, msk_vol = self._add_volume()
+        # add channel dimension
+        img_vol = img_vol.unsqueeze(0)
+        msk_vol = msk_vol.unsqueeze(0)
+        return img_vol, msk_vol
 
 def normalize_image(image):
     image = cv2.equalizeHist(image)
@@ -113,7 +81,7 @@ def normalize_image(image):
     return image
 
 def load_random_volume(img_path, mask_path, vol_shape=(TILE_SIZE, TILE_SIZE, TILE_SIZE), 
-                       img_file_ext=IMG_FILE_EXT, msk_file_ext=MASK_FILE_EXT, start_pos='random'):
+                       img_file_ext=IMG_FILE_EXT, msk_file_ext=MASK_FILE_EXT, start_pos='random', verbose=False):
     """Loads a random volume from a series of image files.
 
     Args:
@@ -152,8 +120,11 @@ def load_random_volume(img_path, mask_path, vol_shape=(TILE_SIZE, TILE_SIZE, TIL
     img_vol = torch.zeros((h, w, d))
     msk_vol = torch.zeros((h, w, d))
     
-    loop = tqdm([i+z_start for i in range(z_end-z_start)])
-    loop.set_description('Loading volume')
+    if verbose:
+        loop = tqdm([i+z_start for i in range(z_end-z_start)])
+        loop.set_description('Loading volume')
+    else:
+        loop = [i+z_start for i in range(z_end-z_start)]
     for i, idx in enumerate(loop):
         img = cv2.imread(img_dirs[idx], cv2.IMREAD_GRAYSCALE) # Load: (H, W)
         msk = cv2.imread(msk_dirs[idx], cv2.IMREAD_GRAYSCALE)
@@ -198,10 +169,10 @@ transform = A.Compose([
 
 
 def create_loader(image_files, mask_files, batch_size, 
-                  transform_2d=None, transform_3d=None, shuffle=False, 
+                  transform_3d=None, shuffle=False, 
                   tile_size=TILE_SIZE, subvol_start_pos='center'):
     dataset = VolumetricDataset(image_files, mask_files, volume_size=(tile_size,tile_size,tile_size), 
-                                transforms_2D=transform_2d, transforms_3D=transform_3d,
+                                transforms_3D=transform_3d,
                                 subvol_start_pos=subvol_start_pos)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
@@ -214,8 +185,16 @@ for kidney in TRAIN_DATASETS:
     mask_dirs.append(os.path.join(BASE_PATH, kidney, 'labels'))
 
 TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE, 
-                            transform_2d=transform, shuffle=True)
+                            shuffle=True)
 
+
+# vol = next(iter(VAL_LOADER))
+# # print(f'Volume shape: {vol[0].shape}')
+# b, c, h, w, d = vol[0].shape
+# print(f'Volume shape: c={c}, h={h}, w={w}, d={d}')
+# # plot a slice
+# plt.imshow(vol[0][0, 0, :, :, 0], cmap='gray')
+# plt.show()
 
 test_mode = False#True
 # print(len(kidney_1_voi_loader))

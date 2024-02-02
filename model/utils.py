@@ -24,6 +24,7 @@ import torch.nn as nn
 # from costom_loss import IoULoss
 from global_params import *
 from dataset import create_loader, preprocess_image, preprocess_mask
+from volumetric_dataset2 import create_loader as create_volumetric_loader
 from helper import fast_compute_surface_dice_score_from_tensor
 from glob import glob
 from torch import Tensor, einsum
@@ -905,6 +906,44 @@ def plot_examples(model, num=5, device='cuda',
         plt.show()
     else:
         plt.close()
+
+def plot_examples3d(model, num=5, device='cuda', 
+                  dataset_folder=VAL_DATASET_DIR, subvol_start='random',
+                  save=False, save_dir=None, show=True):
+    images_path = os.path.join(dataset_folder, 'images')
+    masks_path = os.path.join(dataset_folder, 'labels')
+    loader = create_volumetric_loader(images_path, masks_path, batch_size=BATCH_SIZE, shuffle=False, subvol_start_pos=subvol_start)
+    img_vols, mask_vols = next(iter(loader))
+    img_vols = img_vols.to(device)
+    model.eval()
+    with torch.no_grad():
+        pred_vols = model(img_vols)
+    pred_vols = torch.sigmoid(pred_vols)
+    pred_vols = (pred_vols > PREDICTION_THRESHOLD).float()
+    # plot num random slices from the volumes
+    fig, axs = plt.subplots(num, 3, figsize=(20, 10*num))
+    for i in range(num):
+        slice_idx = np.random.choice(img_vols.shape[2])
+        img_slice = img_vols[0, 0, slice_idx].cpu()
+        mask_slice = mask_vols[0, 0, slice_idx].cpu()
+        pred_slice = pred_vols[0, 0, slice_idx].cpu()
+        axs[i, 0].imshow(img_slice, cmap='gray')
+        axs[i, 0].set_title('Original Image')
+        axs[i, 0].axis('off')
+        axs[i, 1].imshow(mask_slice, cmap='gray')
+        axs[i, 1].set_title('Mask')
+        axs[i, 1].axis('off')
+        axs[i, 2].imshow(pred_slice, cmap='gray')
+        axs[i, 2].set_title('Prediction')
+        axs[i, 2].axis('off')
+    fig.suptitle('Examples')
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.9) # add some space at the top of the figure for the title
+    if save:
+        save_dir = save_dir if save_dir is not None else 'saved_images/plot_examples.png'
+        plt.savefig(save_dir)
+    if show:
+        plt.show()
 
 def show_image_pred(img, pred, mask=None, 
                     figsize=(10, 6),
