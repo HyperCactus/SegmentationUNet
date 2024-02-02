@@ -2,7 +2,7 @@
 Global parameters for the UNet model defined here for easy access across files.
 """
 
-HPC = True
+HPC = False#True
 PNG_DSET = True
 TEST_MODE = False#not HPC
 
@@ -14,7 +14,7 @@ BATCH_SIZE = 32 if HPC else 4#16
 NUM_EPOCHS = 30 if HPC else 15
 NUM_WORKERS = 4
 PIN_MEMORY = True
-PREDICTION_THRESHOLD = 0.51
+PREDICTION_THRESHOLD = 0.53
 IN_CHANNELS = 1 # I've stacked the previous image, current image, and next image as the input channels
 
 IMAGE_HEIGHT = 256
@@ -28,13 +28,13 @@ TILES_IN_Y = 9#3
 
 TILE_SIZE = 512#256
 
-# CHECKPOINT_DIR = 'checkpoints/checkpoint.pth.tar'
+CHECKPOINT_DIR = 'checkpoints/checkpoint.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/in_chans3.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/IoU_loss_15ep.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/big_train.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/1024_model.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/256_model.pth.tar'
-CHECKPOINT_DIR = 'checkpoints/512_vol_train.pth.tar'
+# CHECKPOINT_DIR = 'checkpoints/512_vol_train.pth.tar'
 
 if PNG_DSET:
     BASE_PATH = 'data_png/train'

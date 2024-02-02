@@ -840,9 +840,9 @@ def inference_fn(model, img:torch.Tensor,
             
     preds /= len(tta_lambdas)
 
-    preds = (torch.sigmoid_(preds)>pred_threshold).double()
+    preds = (torch.sigmoid(preds).cpu()>pred_threshold).double()
     # preds = preds.cpu().numpy().astype(np.uint8)
-    return preds.cpu()
+    return preds
 
 
 def plot_examples(model, num=5, device='cuda', 

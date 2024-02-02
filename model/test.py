@@ -17,7 +17,7 @@ if __name__ == '__main__':
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
     load_checkpoint(torch.load(CHECKPOINT_DIR), model)
 
-    plot_examples(model, num=5, device=device, dataset_folder=VAL_DATASET_DIR, sub_data_idxs=(500, 1400))
+    plot_examples(model, num=5, device=device, dataset_folder=VAL_DATASET_DIR)
     
     # img = preprocess_image('data_png/train/kidney_1_dense/images/0610.png')
     # img = preprocess_image('data_png/train/kidney_2/images/1262.png')

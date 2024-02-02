@@ -166,7 +166,7 @@ def main():
     load_checkpoint(torch.load(CHECKPOINT_DIR), model_512)
 
     surface_dice_score = local_surface_dice(model_512, device, dataset_folder=VAL_DATASET_DIR, 
-                                            verbose=True, fast_mode=True)
+                                            verbose=True, fast_mode=False, sub_data_idxs=(0, 15))
 
     print(f'Surface Dice Score: {surface_dice_score:.4f}')
     
