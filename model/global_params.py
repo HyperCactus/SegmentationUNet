@@ -26,7 +26,7 @@ HIGH_PASS_STRENGTH = 0.1
 TILES_IN_X = 12#4
 TILES_IN_Y = 9#3
 
-TILE_SIZE = 256 if HPC else 32#64
+TILE_SIZE = 128 if HPC else 32#64
 
 CHECKPOINT_DIR = 'checkpoints/checkpoint.pth.tar'
 # CHECKPOINT_DIR = 'checkpoints/in_chans3.pth.tar'
