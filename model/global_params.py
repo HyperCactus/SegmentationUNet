@@ -9,10 +9,10 @@ TEST_MODE = False#not HPC
 # Hyperparameters
 # LEARNING_RATE = 1e-4
 LEARNING_RATE = 1e-5
-BATCH_SIZE = 2 if HPC else 16
+BATCH_SIZE = 1 if HPC else 16
 # BATCH_SIZE = 3 # Laptop
 NUM_EPOCHS = 30 if HPC else 2
-NUM_WORKERS = 4
+NUM_WORKERS = 1
 PIN_MEMORY = True
 PREDICTION_THRESHOLD = 0.53
 IN_CHANNELS = 1 # I've stacked the previous image, current image, and next image as the input channels
