@@ -11,6 +11,7 @@ from tqdm import tqdm
 from modules import ImprovedUNet
 from dataset import preprocess_image, preprocess_mask
 from volumetric_dataset2 import TRAIN_LOADER, create_loader
+# from volumetric_dataset import VOL_TRAIN_LOADER as TRAIN_LOADER
 import time
 from utils import *
 from glob import glob
@@ -191,14 +192,16 @@ def train():
         # Update the learning rate
         scheduler.step(epoch_losses[-1])
         # scheduler.step(epoch_variances[-1])
-        # if not TEST_MODE:
-        #     plot_examples(model, num=5, device=device, 
-        #                 dataset_folder=VAL_DATASET_DIR, 
-        #                 save=True, save_dir=f'saved_images/epoch_{epoch+1}_examples.png', 
-        #                 show=False)
-        #     # read the image with PIL and convert to numpy array
-        #     img = torch.tensor(cv2.imread(f'saved_images/epoch_{epoch+1}_examples.png')).permute(2, 0, 1).float() / 255.0
-        #     writer.add_image('example_predictions', img, epoch)
+        if not TEST_MODE:
+            # plot_examples(model, num=5, device=device, 
+            #             dataset_folder=VAL_DATASET_DIR, 
+            #             save=True, save_dir=f'saved_images/epoch_{epoch+1}_examples.png', 
+            #             show=False)
+            plot_examples3d(model, num=5, device=device, save=True, 
+                            save_dir=f'saved_images/epoch_{epoch+1}_examples.png', show=False)
+            # read the image with PIL and convert to numpy array
+            img = torch.tensor(cv2.imread(f'saved_images/epoch_{epoch+1}_examples.png')).permute(2, 0, 1).float() / 255.0
+            writer.add_image('example_predictions', img, epoch)
         
         # Calculate the validation dice score after each epoch
         # select a random subvolume from the validation dataset
