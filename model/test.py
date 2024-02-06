@@ -5,7 +5,7 @@ import cv2
 import os
 from modules import ImprovedUNet
 from glob import glob
-from utils import inference_fn, load_checkpoint, plot_examples, remove_small_objects
+from utils import inference_fn, load_checkpoint, plot_examples, remove_small_objects, plot_examples3d
 from dataset import preprocess_image, preprocess_mask
 from global_params import *
         
@@ -17,7 +17,8 @@ if __name__ == '__main__':
     model = ImprovedUNet(in_channels=IN_CHANNELS, out_channels=1).to(device=device)
     load_checkpoint(torch.load(CHECKPOINT_DIR), model)
 
-    plot_examples(model, num=5, device=device, dataset_folder=VAL_DATASET_DIR)
+    # plot_examples(model, num=5, device=device, dataset_folder=VAL_DATASET_DIR)
+    plot_examples3d(model)
     
     # img = preprocess_image('data_png/train/kidney_1_dense/images/0610.png')
     # img = preprocess_image('data_png/train/kidney_2/images/1262.png')
