@@ -2,9 +2,11 @@
 #### This is my entry to the [SenNet + HOA - Hacking the Human Vasculature in 3D](https://www.kaggle.com/competitions/blood-vessel-segmentation) Competition on Kaggle
 
 ## Files:
-`train.py` - script for training the model \\
-`evaluate.py` - script for evaluating model \\
-`utils.py` - helper functions
+* `train.py` - script for training the model
+* `evaluate.py` - script for evaluating model
+* `utils.py` - helper functions
+* `custom_loss.py` - The custom loss functions for the model
+* `modules.py` - The model and its modules 
 
 
 ## TLDR:
@@ -12,12 +14,12 @@ The goal of this project is to automatically segment the blood vessels from high
 
 Example:
 
-![figure 1: example output](_readme_ims/tiled_example1.png) \\
+<!-- ![figure 1: example output](_readme_ims/tiled_example1.png) \\ -->
 
 ![figure 2: randomized examples from validation set](_readme_ims/randomized_val_examples2.png)
 
 ## Data:
-The data for 
+The data for this project is available on the [competition page](https://www.kaggle.com/competitions/blood-vessel-segmentation/data), it consists of 3 entire kidneys scanned in 3D using Hierarchical Phase-Contrast Tomography (HiP-CT) imaging. 
 
 Animation: \\
 ![figure 2: animation of kidney data](_readme_ims/animation.gif)

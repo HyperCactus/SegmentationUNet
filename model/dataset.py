@@ -1,59 +1,44 @@
-"""
-Code copied from https://www.kaggle.com/code/aniketkolte04/sennet-hoa-seg-pytorch-attention-gated-unet
-pytorch dataset for the challenge.
-"""
-import torch
-from torch.utils.data import Dataset
-from torchvision import transforms
-import tifffile as tiff
-import cv2
-import torch.nn as nn
-import albumentations as A
+# From lab 3
+
 import numpy as np
-import os
-import time
+import torch.nn as nn
 import torch.nn.functional as F
-from PIL import Image
-import matplotlib.pyplot as plt
+import torchvision.transforms as transforms
+import torch
+import os
+import cv2
+import PIL.Image as Image
+from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+import matplotlib.pyplot as plt
+from glob import glob
 from global_params import *
-from sklearn.model_selection import train_test_split
-
-# project_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# print(f'project_dir: {project_dir}')
-# os.chdir(project_dir) # change to project directory
-
-# images_path = os.path.join(base_path, dataset, 'images')
-# labels_path = os.path.join(base_path, dataset, 'labels')
-
-# image_files = sorted([os.path.join(images_path, f) for f in os.listdir(images_path) if f.endswith('.tif')])
-# label_files = sorted([os.path.join(labels_path, f) for f in os.listdir(labels_path) if f.endswith('.tif')])
-
-# def show_images(images,titles= None, cmap='gray'):
-#     n = len(images)
-#     fig, axes = plt.subplots(1, n, figsize=(20, 10))
-#     if not isinstance(axes, np.ndarray):
-#         axes = [axes]
-#     for idx, ax in enumerate(axes):
-#         ax.imshow(images[idx], cmap=cmap)
-#         if titles:
-#             ax.set_title(titles[idx])
-#         ax.axis('off')
-#     plt.tight_layout()
-#     plt.show()
-
-# first_image = tiff.imread(image_files[981])
-# first_label = tiff.imread(label_files[981])
-
-# show_images([first_image, first_label], titles=['First Image', 'First Label'])
 
 class CustomDataset(Dataset):
-    def __init__(self, image_files, mask_files, 
-                 input_size=(IMAGE_WIDTH, IMAGE_HEIGHT), 
-                 augmentation_transforms=None):
+    def __init__(self, images_path, masks_path, 
+                 augmentation_transforms=None,
+                 img_file_ext=IMG_FILE_EXT, mask_file_ext=MASK_FILE_EXT, sub_data_idxs=None):
+        
+        images_path = [images_path] if isinstance(images_path, str) else images_path
+        masks_path = [masks_path] if isinstance(masks_path, str) else masks_path
+        assert len(images_path) == len(masks_path), \
+            f'Number of images and masks do not match. Found {len(images_path)} images and {len(masks_path)} masks.'
+        
+        image_files = []
+        mask_files = []
+        for image_dir, mask_dir in zip(images_path, masks_path):
+            image_files += sorted(glob(os.path.join(image_dir, f'*{img_file_ext}')))
+            mask_files += sorted(glob(os.path.join(mask_dir, f'*{mask_file_ext}')))
+        if sub_data_idxs is not None:
+            start = sub_data_idxs[0]
+            end = sub_data_idxs[1]
+            image_files = image_files[start:end]
+            mask_files = mask_files[start:end]
+        
         self.image_files = image_files
         self.mask_files = mask_files
-        self.input_size = input_size
         self.augmentation_transforms = augmentation_transforms
 
     def __len__(self):
@@ -64,13 +49,14 @@ class CustomDataset(Dataset):
         image_path = self.image_files[idx]
         mask_path = self.mask_files[idx]
 
-        image = preprocess_image(image_path)
-        mask = preprocess_mask(mask_path)
+        image = min_size(preprocess_image(image_path), min_size=TILE_SIZE)
+        mask = min_size(preprocess_mask(mask_path), min_size=TILE_SIZE)
 
         if self.augmentation_transforms:
             image, mask = self.augmentation_transforms(image, mask)
 
         return image, mask
+
 
 class UsageDataset(Dataset):
     def __init__(self, image_files, 
@@ -87,24 +73,33 @@ class UsageDataset(Dataset):
        
         image_path = self.image_files[idx]
 
-        image = preprocess_image(image_path)
+        image, orig_size = preprocess_image(image_path, return_size=True)
+        # orig_size = image.shape
 
         if self.augmentation_transforms:
             image = self.augmentation_transforms(image)
 
-        return image
+        return image, torch.tensor(np.array([orig_size[0], orig_size[1]]))
 
 
 def preprocess_image(path):
-    
+    # print(f'path: {path}')
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     # img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     # print(f'fresh process image img.shape: {img.shape}')
-    img = np.tile(img[...,None],[1, 1, 3]) 
+    
+    if IN_CHANNELS == 1:
+        img = np.tile(img[...,None],[1, 1, 1])
+    else:
+        img = np.tile(img[...,None],[1, 1, 3]) 
     img = img.astype('float32') 
+
+    # normalize and mean center the image
     mx = np.max(img)
     if mx:
-        img/=mx 
+        img/=mx
+
+    orig_size = img.shape
     
     # print(f'process image img.shape: {img.shape}')
     img = np.transpose(img, (2, 0, 1))
@@ -116,6 +111,7 @@ def preprocess_mask(path):
     msk = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     msk = msk.astype('float32')
     msk/=255.0
+    # msk = remove_small_objects(msk.astype(np.uint8), 500)
     msk_ten = torch.tensor(msk)
     
     return msk_ten
@@ -126,20 +122,22 @@ def augment_image(image, mask):
     mask_np = mask.numpy()
 
     transform = A.Compose([
-        A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, always_apply=True),
-        A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
-        A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=15, shift_limit=0.1, p=0.8, border_mode=0),
-        A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.2, 0.2), contrast_limit=(-0.2, 0.2)),
+        A.ShiftScaleRotate(scale_limit=(-0.3, 0.1), rotate_limit=180, shift_limit=0.1, p=0.8, border_mode=0), # for 1024 model
+        # A.ShiftScaleRotate(scale_limit=(-0.1, 0.4), rotate_limit=180, shift_limit=0.1, p=0.8, border_mode=0),
+        A.Affine(shear=(-10, 10), p=0.4), # Untested addition (shear transform)
+        A.RandomBrightnessContrast(p=0.5, brightness_limit=(-0.1, 0.1), contrast_limit=(-0.2, 0.2)),
         A.OneOf(
             [
-                A.Blur(blur_limit=3, p=1),
-                A.MotionBlur(blur_limit=3, p=1),
+                A.Blur(blur_limit=3, p=0.9),
+                A.MotionBlur(blur_limit=3, p=0.9),
             ],
             p=0.7,
         ),
-        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+        A.RandomCrop(height=IMAGE_HEIGHT, width=IMAGE_WIDTH, p=0.9),
+        A.Resize(IMAGE_HEIGHT, IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
+        # A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
     ])
 
     augmented = transform(image=image_np, mask=mask_np)
@@ -156,8 +154,9 @@ def val_transform(image, mask):
     mask_np = mask.numpy()
 
     transform = A.Compose([
-        A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
-        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=True),  # High pass filter
+        # A.Resize(IMAGE_HEIGHT,IMAGE_WIDTH, interpolation=cv2.INTER_NEAREST),
+        A.Emboss(alpha=HIGH_PASS_ALPHA, strength=HIGH_PASS_STRENGTH, always_apply=False, p=0),  # High pass filter
+        # add the identity transform to do nothing
     ])
 
     augmented = transform(image=image_np, mask=mask_np)
@@ -168,103 +167,96 @@ def val_transform(image, mask):
 
     return augmented_image, augmented_mask
 
+def min_size(img, min_size=1024):
+    """
+    If the image is smaller than the min_size on any dimension, 
+    then pad the image to be at least min_size on that dimension.
+    """
+    h, w = img.shape[-2:] # this works for single image or batch
+    x_pad = 0 if w >= min_size else (min_size - w) // 2
+    y_pad = 0 if h >= min_size else (min_size - h) // 2
+    new_img = nn.ZeroPad2d((x_pad, x_pad, y_pad, y_pad))(img)
+    return new_img
+
+def remove_small_objects(img, min_size):
+    # Find all connected components (labels)
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(img, connectivity=8)
+
+    # Create a mask where small objects are removed
+    new_img = np.zeros_like(img)
+    for label in range(1, num_labels):
+        if stats[label, cv2.CC_STAT_AREA] >= min_size:
+            new_img[labels == label] = 1
+
+    return new_img
+
 def create_loader(image_files, mask_files, batch_size, 
+                  transform=None, shuffle=False, sub_data_idxs=None):
+    
+    dataset = CustomDataset(image_files, mask_files, augmentation_transforms=transform, sub_data_idxs=sub_data_idxs)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+
+def create_test_loader(image_files, batch_size, 
                   augmentations=None, shuffle=False):
     
-    dataset = CustomDataset(image_files, mask_files, augmentation_transforms=augmentations)
+    dataset = UsageDataset(image_files, augmentation_transforms=augmentations)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-    
 
-#-------------------------- Test the dataset --------------------------#
-image_files = []
-label_files = []
-for dataset in datasets:
-    images_path = os.path.join(base_path, dataset, 'images')
-    labels_path = os.path.join(base_path, dataset, 'labels')
+VAL_LOADER = create_loader(VAL_IMG_DIR, VAL_MASK_DIR, BATCH_SIZE, transform=None, shuffle=False)
 
-    image_files.extend(sorted([os.path.join(images_path, f) for f in os.listdir(images_path) if f.endswith('.tif')]))
-    label_files.extend(sorted([os.path.join(labels_path, f) for f in os.listdir(labels_path) if f.endswith('.tif')]))
+image_dirs = []
+mask_dirs = []
+for kidney in TRAIN_DATASETS:
+    image_dirs.append(os.path.join(BASE_PATH, kidney, 'images'))
+    mask_dirs.append(os.path.join(BASE_PATH, kidney, 'labels'))
 
-# images_path = os.path.join(base_path, dataset, 'images')
-# labels_path = os.path.join(base_path, dataset, 'labels')
-
-# image_files = sorted([os.path.join(images_path, f) for f in os.listdir(images_path) if f.endswith('.tif')])
-# label_files = sorted([os.path.join(labels_path, f) for f in os.listdir(labels_path) if f.endswith('.tif')])
-
-train_image_files, val_image_files, train_mask_files, val_mask_files = train_test_split(
-    image_files, label_files, test_size=0.1, random_state=42)
-
-# testing_path = 'data_downsampled512/train/test_output'
-# testing_img_files = sorted([os.path.join(testing_path, 'images', f) for f in os.listdir(testing_path+'/images') if f.endswith('.tif')])
-# testing_mask_files = sorted([os.path.join(testing_path, 'labels', f) for f in os.listdir(testing_path+'/labels') if f.endswith('.tif')])
-# testing_mask_files = train_mask_files[:len(testing_img_files)]
-
-train_dataset = CustomDataset(train_image_files, train_mask_files, augmentation_transforms=augment_image)
-val_dataset = CustomDataset(val_image_files, val_mask_files, augmentation_transforms=val_transform)
-# test_of_dataset = CustomDataset(testing_img_files, testing_mask_files, augmentation_transforms=val_transform)
-
-TRAIN_LOADER = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-VAL_LOADER = DataLoader(val_dataset, batch_size=1, shuffle=False)
-# testing_loader = DataLoader(test_of_dataset, batch_size=1, shuffle=True)
-
-# for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
-#     print("Batch", batch_idx + 1)
-#     print("Image batch shape:", batch_images.shape)
-#     print("Mask batch shape:", batch_masks.shape)
+TRAIN_LOADER = create_loader(image_dirs, mask_dirs, BATCH_SIZE, 
+                            transform=augment_image, shuffle=True)
 
 
-for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
-    print("Batch", batch_idx + 1)
-    print("Image batch shape:", batch_images.shape)
-    print("Mask batch shape:", batch_masks.shape)
-    
-    for image, mask, image_path, mask_path in zip(batch_images, batch_masks, train_image_files, train_mask_files):
-       
-        image = image.permute((1, 2, 0)).numpy()*255.0
-        image = image.astype('uint8')
-        mask = (mask*255).numpy().astype('uint8')
+test_mode = False#True
+# print(len(kidney_1_voi_loader))
+
+if test_mode:
+    # testing the dataset:
+    for batch_idx, (batch_images, batch_masks) in enumerate(TRAIN_LOADER):
+        # print(f'BATCH {batch_idx+1}')
+        # if batch_idx < 200/BATCH_SIZE:
+        #     continue
+        if batch_idx > (4):
+            break
+        print("Batch", batch_idx + 1)
+        print("Image batch shape:", batch_images.shape)
+        print("Mask batch shape:", batch_masks.shape)
         
-        image_filename = os.path.basename(image_path)
-        mask_filename = os.path.basename(mask_path)
-        
-        plt.figure(figsize=(15, 10))
-        
-        plt.subplot(2, 4, 1)
-        plt.imshow(image, cmap='gray')
-        plt.title(f"Original Image - {image_filename}")
-        
-        plt.subplot(2, 4, 2)
-        plt.imshow(mask, cmap='gray')
-        plt.title(f"Mask Image - {mask_filename}")
-        
-        plt.tight_layout()
-        plt.show()
-    break
+        for image, mask in zip(batch_images, batch_masks):
+            noise = torch.randn_like(image) * NOISE_MULTIPLIER
+            image = image + noise
+            image = image.permute((1, 2, 0)).numpy()*255.0;
+            print(f'image.shape: {image.shape}')
+            # image = image.squeeze(0).numpy()*255.0
+            # image = image.numpy()*255.0
+            # print(f'image.shape postsqueese: {image.shape}')
+            image = image.astype('uint8')
+            mask = (mask*255).numpy().astype('uint8')
+            print(f'mask sum = {np.sum(mask)}')
+            # mask = mask.squeeze(0)
+            
+            # image_filename = os.path.basename(image_path)
+            # mask_filename = os.path.basename(mask_path)
+            
+            plt.figure(figsize=(10, 5))
+            
+            plt.subplot(1, 2, 1)
+            plt.imshow(image, cmap='gray')
+            # plt.title(f"Original Image - {image_filename}")
+            
+            plt.subplot(1, 2, 2)
+            plt.imshow(mask, cmap='gray')
+            # plt.title(f"Mask Image - {mask_filename}")
+            
+            plt.tight_layout()
+            plt.show()
+        # break
 
-# for batch_idx, (batch_images, batch_masks) in enumerate(VAL_LOADER):
-#     print("Batch", batch_idx + 1)
-#     print("Image batch shape:", batch_images.shape)
-#     print("Mask batch shape:", batch_masks.shape)
-    
-#     for image, mask, image_path, mask_path in zip(batch_images, batch_masks, train_image_files, train_mask_files):
-       
-#         image = image.permute((1, 2, 0)).numpy()*255.0
-#         image = image.astype('uint8')
-#         mask = (mask*255).numpy().astype('uint8')
-        
-#         image_filename = os.path.basename(image_path)
-#         mask_filename = os.path.basename(mask_path)
-        
-#         plt.figure(figsize=(15, 10))
-        
-#         plt.subplot(2, 4, 1)
-#         plt.imshow(image, cmap='gray')
-#         plt.title(f"Original Image - {image_filename}")
-        
-#         plt.subplot(2, 4, 2)
-#         plt.imshow(mask, cmap='gray')
-#         plt.title(f"Mask Image - {mask_filename}")
-        
-#         plt.tight_layout()
-#         plt.show()
-#     break
+

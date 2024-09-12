@@ -57,3 +57,73 @@ validation dice score = 0.6541
 validation dice score = 0.7964
 surface dice score = 0.9564
 * Check if overfitting!
+* implement smart tiling! check out https://www.kaggle.com/code/squidinator/sennet-hoa-in-memory-tiled-dataset-pytorch
+* need to resize masks to original size for submission, tiling is the ultimate goal
+* check [this](https://stackoverflow.com/questions/58216000/get-total-amount-of-free-gpu-memory-and-available-using-pytorch) out for gpu memory usage info for rangpur optimization.
+* submission to kaggle, images downsampled to 512x512 and then upscaled using cv2.INTER_CUBIC interpolation, using remove small objects 5.
+public score: 0.208
+* turned off remove small objects.
+public score: 0.209
+* Local inference using kidney 2 as validation set with same process as kaggle submission, prediction threshold 0.9.
+Surface Dice Score: 0.6954
+* Average train time on Rangpur = 3 min per epoch
+* Added shear augmentations 
+
+* for tta: `pred = model(non augmented)`
+`pred *= model(tta image)/THRESHOLD`
+
+* added simple tiling:
+public score -> 0.474
+
+* added advanced tiling with averaging on overlap, increasing tile size is like TTA, tiles = 6x6 (on subset of k2):
+local Surface Dice Score: 0.9749
+
+* advanced tiling, no TTA, 6x6 tiles:
+public score -> 0.524
+
+* local 3D Surface Dice Score computation on k2 subset with TTA and 5x4 tiles, using min max norm:
+3D Surface Dice Score: 0.8113647134695395
+
+* local 3D Surface Dice Score computation on k2 subset with TTA and 5x4 tiles, using /255 norm:
+3D Surface Dice Score: 0.8560464274635169
+
+* local 3D Surface Dice Score computation on k2 subset with TTA and 8x6 tiles, using /255 norm:
+3D Surface Dice Score: 0.8622700067466642
+
+* local 3D Surface Dice Score computation on k2 subset with TTA and 3x3 tiles, using /255 norm:
+3D Surface Dice Score: 0.8295686825426427
+
+* local 3D Surface Dice Score computation on k2 subset with TTA and 3x3 tiles, using /255 norm with remove small objects 5:
+3D Surface Dice Score: 0.8319619583782941
+* local 3D Surface Dice Score computation on k2 subset with TTA and 3x3 tiles, using /255 norm with remove small objects 10:
+3D Surface Dice Score: 0.8179505718489243
+* local 3D Surface Dice Score computation on k2 subset with TTA and 3x3 tiles, using /255 norm with remove small objects 3:
+3D Surface Dice Score: 0.831656864880501
+
+* Normalization, chop outliers, make kidney invariant
+
+* Rangpur Partitions:
+PARTITION
+cpu
+largecpu
+p100
+kaleen
+a100
+a100-test*
+
+* test with/without noise, 3 vs 1 in_chans, ..., png data on rangpur 
+* try multiple optimizers with different loss functions...
+* add multiscale inference pipeline tried, made SDC worse
+
+* experiment result, iou loss, 15 epoch, on val set (500, 1400)
+3D SDC = 0.7060
+* binary dice loss, 15 epoch, on val set (500, 1400)
+3D SDC = 0.6105
+* 8.0 x iou loss + 0.2 x dice loss, 100 epoch, on val set (500, 1400)
+3D SDC = 0.7015
+
+* train a 256 model
+
+* Somethings not right!!
+* Fix normalization on volumetric dataset!!!
+* check chatGPT code

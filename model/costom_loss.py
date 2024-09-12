@@ -2,63 +2,25 @@
 Coppied from https://www.kaggle.com/code/aniketkolte04/sennet-hoa-seg-pytorch-attention-gated-unet
 """
 import torch
+from torch import Tensor, einsum
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import _LRScheduler
+from typing import List, cast
+import numpy as np
+from utils import one_hot2hd_dist, probs2one_hot, simplex, one_hot
+from global_params import PREDICTION_THRESHOLD, TILE_SIZE
+from helper import fast_compute_surface_dice_score_from_tensor
 
-
-
-class FocalLoss(nn.modules.loss._WeightedLoss):
-
-    def __init__(self, gamma=0, size_average=None, ignore_index=-100,
-                 reduce=None, balance_param=1.0):
-        super(FocalLoss, self).__init__(size_average)
-        self.gamma = gamma
-        self.size_average = size_average
-        self.ignore_index = ignore_index
-        self.balance_param = balance_param
-
-    def forward(self, input, target):
-        
-        assert len(input.shape) == len(target.shape)
-        assert input.size(0) == target.size(0)
-        assert input.size(1) == target.size(1)
-
-        logpt = - F.binary_cross_entropy_with_logits(input, target)
-        pt = torch.exp(logpt)
-
-        focal_loss = -((1 - pt) ** self.gamma) * logpt
-        balanced_focal_loss = self.balance_param * focal_loss
-        return balanced_focal_loss
-
-class IslandLoss(nn.Module):
-    """
-    A loss function that penalizes the model for predicting more or fewer 
-    islands of pixels then are present in the mask.
-    """
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-    
-    def forward(self, prediction, targets, smooth=1):
-        
-        # an island is a group of white pixels, (pixels with value of 1) that are connected
-        # islands are separated by black pixels (pixels with value of 0)
-        # we will need to use a clever algorithm to find the number of islands in the mask
-        pass
-        
-
-def calc_islands(mask):
-    """
-    Calculates the number of islands in the mask
-    """
-    pass
 
 
 # Intersection over Union (IoU) loss
 class IoULoss(nn.Module):
-    def __init__(self, weight=None, size_average=True, eps=1e-7):
+    def __init__(self, weight=None, size_average=True, smooth=1):
         super(IoULoss, self).__init__()
+        self.smooth = smooth
 
-    def forward(self, prediction, targets, smooth=1):
+    def forward(self, prediction, targets):
         # comment out if your model contains a sigmoid or equivalent activation layer
         inputs = torch.sigmoid(prediction)       
         
@@ -72,7 +34,7 @@ class IoULoss(nn.Module):
         total = (inputs + targets).sum()
         union = total - intersection 
         
-        IoU = (intersection + smooth)/(union + smooth)  # smooth is added to avoid divide by zero error
+        IoU = (intersection + self.smooth)/(union + self.smooth)  # smooth is added to avoid divide by zero error
         
         return 1 - IoU
 
@@ -82,7 +44,7 @@ class IoULoss(nn.Module):
 class BlackToWhiteRatioLoss(nn.Module):
     """Loss based on the ratio of black pixels to white pixels in the mask"""
     
-    def __init__(self, weight=None, avtivation_threshold=0.5,
+    def __init__(self, weight=None, avtivation_threshold=PREDICTION_THRESHOLD,
                  size_average=True, eps=1e-7):
         """Initialize the loss function"""
         
@@ -93,46 +55,13 @@ class BlackToWhiteRatioLoss(nn.Module):
     def forward(self, predictions, targets, smooth=1):
         """Forward pass of the loss function"""
         assert predictions.shape[0] == targets.shape[0], "predict & target batch size don't match"
-        inputs = predictions.contiguous().view(predictions.shape[0], -1)
-        targets = targets.contiguous().view(targets.shape[0], -1)
         
-        # comment out if your model contains a sigmoid or equivalent activation layer
-        # inputs = torch.sigmoid(predictions)       
-        
-        # flatten label and prediction tensors
-        # inputs = inputs.view(-1)
-        # targets = targets.view(-1)
-        
-        # calculate the ratio of black pixels to white pixels
-        # black_pixels_pred = (inputs < self.threshold).sum()
-        # white_pixels_pred = (inputs >= self.threshold).sum()
-        # ratio_pred = black_pixels_pred / white_pixels_pred
-        
-        # black_pixels_mask = (targets == 0).sum()
-        # white_pixels_mask = (targets == 1).sum()
-        # ratio_mask = black_pixels_mask / white_pixels_mask
-        
-        # loss = torch.abs(ratio_pred - ratio_mask)\
-        
-        # print('Pass 1')
-        # predicted = torch.Tensor((inputs < self.threshold).sum().sum())
-        # print('Pass 2')
-        # target = torch.Tensor(targets.sum().sum())
-        # print('Pass 3')
-        # # loss = nn.MSELoss(predicted, target)
-        # loss = F.mse_loss(predicted, target)
-        # print(f'loss: {loss}, type: {type(loss)}')
-        
-        # calculate the number of ones (white pixels) in the mask
-        ones_in_mask = torch.sum(targets)
-        
-        # calculate the number of elements in the prediction that are greater than the threshold
-        # ones_in_pred = (inputs > self.threshold).sum()
-        mask = inputs > self.threshold
-        ones = torch.ones_like(inputs)
-        ones_in_pred = torch.sum(ones[mask])
-        
-        loss = torch.abs(1 - (ones_in_pred / ones_in_mask))
+        predictions = F.sigmoid(predictions)
+        # intersection = (predictions * targets).sum()
+        # loss = 1 - intersection
+        th_preds = predictions > self.threshold
+        sum_ratio = predictions.sum() / targets.sum()
+        loss = torch.abs(sum_ratio - 1)
         
         return loss
 
@@ -176,43 +105,406 @@ class BinaryDiceLoss(nn.Module):
         elif self.reduction == 'none':
             return loss
         else:
-            raise Exception('Unexpected reduction {}'.format(self.reduction))
+            raise Exception(f'Unexpected reduction {self.reduction}')
+
+class IoUDiceLoss(nn.Module):
+    def __init__(self, weight=None, size_average=True, smooth=1, iou_weight=0.8, dice_weight=0.2):
+        super(IoUDiceLoss, self).__init__()
+        self.smooth = smooth
+        self.iou_weight = iou_weight
+        self.dice_weight = dice_weight
+        self.dice = BinaryDiceLoss()
+        self.iou = IoULoss()
+
+    def forward(self, prediction, targets):
+        dice_loss = self.dice(prediction, targets)
+        iou_loss = self.iou(prediction, targets)
+        
+        loss = (self.iou_weight * iou_loss) + (self.dice_weight * dice_loss)
+        
+        return loss
+
+class CustomFocalLoss(nn.Module):
+    def __init__(self, alpha=0.25, gamma=2.0):
+        super(CustomFocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.iou = IoULoss()
+        self.dice_loss = BinaryDiceLoss()
+
+    def forward(self, inputs, targets):
+        # inputs = torch.sigmoid(inputs)
+        BCE_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction='none')
+        Dice_loss = self.dice_loss(inputs, targets)
+        IoU_loss = self.iou(inputs, targets)
+        l = 0.9*IoU_loss + 0.1*Dice_loss + BCE_loss
+        pt = torch.exp(-l)  # prevents nans when probability 0
+        F_loss = self.alpha * (1 - pt) ** self.gamma * l
+        return F_loss.mean()
+
+
+
+class NeuralLoss(nn.Module):
+    """Loss function that predicts the surface dice score for the prediction
+    """
+    def __init__(self, image_size=TILE_SIZE):
+        super(NeuralLoss, self).__init__()
+        self.size = image_size
+        self.network = nn.Sequential( # input size is self.size x self.size x 2 (prediction and target)
+            nn.Conv2d(2, 4, kernel_size=3, padding=1), # 1st conv block
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Conv2d(4, 8, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Conv2d(8, 16, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.InstanceNorm2d(16),
+            nn.MaxPool2d(kernel_size=2, stride=2), # now self.size/2 x self.size/2, 16 feature maps
+            nn.Conv2d(16, 32, kernel_size=3, padding=1), # 2nd conv block
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.InstanceNorm2d(128),
+            nn.MaxPool2d(kernel_size=2, stride=2), # now self.size/4 x self.size/4, 128 feature maps
+            nn.Flatten(), # now dense layers
+            nn.Linear(128 * (self.size//4) * (self.size//4), 1024),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Linear(1024, 512),
+            nn.LeakyReLU(negative_slope=1e-2),
+            nn.Linear(512, 1),
+            nn.Sigmoid() # output is a single number between 0 and 1 (predicted surface dice score)
+        )
+        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=1e-3)
+    
+    def _train_loss(self, predicted_sdc, real_sdc):
+        """Calculate the loss for training"""
+        return torch.abs(predicted_sdc - real_sdc)^2
+        
+    def forward(self, prediction, targets, train=True):
+        """Every forward pass of this loss function will train the neural network, unless train=False"""
+        
+        predicted_sdc = self.network(torch.cat((prediction, targets), dim=1))
+        
+        if train:
+            real_surface_dice = fast_compute_surface_dice_score_from_tensor(targets.cpu().numpy(), prediction.cpu().numpy())
+            loss = self._train_loss(predicted_sdc, real_surface_dice)
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            
+        return predicted_sdc
+
+# def test_neural_loss():
+#     """Test the NeuralLoss class"""
+#     loss = NeuralLoss()
+#     print(loss(torch.rand((1, 1, 512, 512)), torch.rand((1, 1, 512, 512))))
+    
+# if __name__ == '__main__':
+#     test_neural_loss()
+
+
+
+
+
+
+
+
+
+
+###############################################################################
+# following from: https://github.com/sunfan-bvb/BoundaryDoULoss/blob/main/TransUNet/utils.py
+
+class BoundaryDoULoss(nn.Module):
+    def __init__(self, n_classes):
+        super(BoundaryDoULoss, self).__init__()
+        self.n_classes = n_classes
+
+    def _one_hot_encoder(self, input_tensor):
+        tensor_list = []
+        for i in range(self.n_classes):
+            temp_prob = input_tensor == i
+            tensor_list.append(temp_prob.unsqueeze(1))
+        output_tensor = torch.cat(tensor_list, dim=1)
+        return output_tensor.float()
+
+    def _adaptive_size(self, score, target):
+        kernel = torch.Tensor([[0,1,0], [1,1,1], [0,1,0]])
+        padding_out = torch.zeros((target.shape[0], target.shape[-2]+2, target.shape[-1]+2))
+        padding_out[:, 1:-1, 1:-1] = target
+        h, w = 3, 3
+
+        Y = torch.zeros((padding_out.shape[0], padding_out.shape[1] - h + 1, padding_out.shape[2] - w + 1)).cuda()
+        for i in range(Y.shape[0]):
+            Y[i, :, :] = torch.conv2d(target[i].unsqueeze(0).unsqueeze(0), kernel.unsqueeze(0).unsqueeze(0).cuda(), padding=1)
+        Y = Y * target
+        Y[Y == 5] = 0
+        C = torch.count_nonzero(Y)
+        S = torch.count_nonzero(target)
+        smooth = 1e-5
+        alpha = 1 - (C + smooth) / (S + smooth)
+        alpha = 2 * alpha - 1
+
+        intersect = torch.sum(score * target)
+        y_sum = torch.sum(target * target)
+        z_sum = torch.sum(score * score)
+        alpha = min(alpha, 0.8)  ## We recommend using a truncated alpha of 0.8, as using truncation gives better results on some datasets and has rarely effect on others.
+        loss = (z_sum + y_sum - 2 * intersect + smooth) / (z_sum + y_sum - (1 + alpha) * intersect + smooth)
+
+        return loss
+
+    def forward(self, inputs, target):
+        # inputs = torch.softmax(inputs, dim=1)
+        inputs = F.sigmoid(inputs)
+        target = target.squeeze(1)
+        target = self._one_hot_encoder(target)
+
+        assert inputs.size() == target.size(), 'predict {} & target {} shape do not match'.format(inputs.size(), target.size())
+
+        loss = 0.0
+        for i in range(0, self.n_classes):
+            loss += self._adaptive_size(inputs[:, i], target[:, i])
+        return loss / self.n_classes
+    
+    
+
+class DiceLoss(nn.Module):
+    def __init__(self, n_classes):
+        super(DiceLoss, self).__init__()
+        self.n_classes = n_classes
+
+    def _one_hot_encoder(self, input_tensor):
+        tensor_list = []
+        for i in range(self.n_classes):
+            temp_prob = input_tensor == i  # * torch.ones_like(input_tensor)
+            tensor_list.append(temp_prob.unsqueeze(1))
+        output_tensor = torch.cat(tensor_list, dim=1)
+        return output_tensor.float()
+
+    def _dice_loss(self, score, target):
+        target = target.float()
+        smooth = 1e-5
+        intersect = torch.sum(score * target)
+        y_sum = torch.sum(target * target)
+        z_sum = torch.sum(score * score)
+        loss = (2 * intersect + smooth) / (z_sum + y_sum + smooth)
+        loss = 1 - loss
+        return loss
+
+    def forward(self, inputs, target, weight=None, softmax=False):
+        if softmax:
+            inputs = torch.softmax(inputs, dim=1)
+        target = self._one_hot_encoder(target)
+        if weight is None:
+            weight = [1] * self.n_classes
+        assert inputs.size() == target.size(), 'predict {} & target {} shape do not match'.format(inputs.size(), target.size())
+        class_wise_dice = []
+        loss = 0.0
+        for i in range(0, self.n_classes):
+            dice = self._dice_loss(inputs[:, i], target[:, i])
+            class_wise_dice.append(1.0 - dice.item())
+            loss += dice * weight[i]
+        return loss / self.n_classes
+
+
+
+###############################################################################
+
+
+
+
+###########################################################################
+# Starting here is from: https://github.com/LIVIAETS/boundary-loss
+class DiceLoss():
+    def __init__(self, **kwargs):
+        # Self.idc is used to filter out some classes of the target mask. Use fancy indexing
+        self.idc: List[int] = kwargs["idc"]
+        print(f"Initialized {self.__class__.__name__} with {kwargs}")
+
+    def __call__(self, probs: Tensor, target: Tensor) -> Tensor:
+        assert simplex(probs) and simplex(target)
+
+        pc = probs[:, self.idc, ...].type(torch.float32)
+        tc = target[:, self.idc, ...].type(torch.float32)
+
+        intersection: Tensor = einsum("bcwh,bcwh->bc", pc, tc)
+        union: Tensor = (einsum("bkwh->bk", pc) + einsum("bkwh->bk", tc))
+
+        divided: Tensor = torch.ones_like(intersection) - (2 * intersection + 1e-10) / (union + 1e-10)
+
+        loss = divided.mean()
+
+        return loss
+
+
+class SurfaceLoss():
+    def __init__(self, **kwargs):
+        # Self.idc is used to filter out some classes of the target mask. Use fancy indexing
+        # self.idc: List[int] = kwargs["idc"]
+        print(f"Initialized {self.__class__.__name__} with {kwargs}")
+
+    def __call__(self, probs: Tensor, dist_maps: Tensor) -> Tensor:
+        probs = F.sigmoid(probs)
+        assert simplex(probs)
+        assert not one_hot(dist_maps)
+
+        pc = probs[:, ...].type(torch.float32)
+        dc = dist_maps[:, ...].type(torch.float32)
+
+        multipled = einsum("bkwh,bkwh->bkwh", pc, dc)
+
+        loss = multipled.mean()
+
+        return loss
+
+class HausdorffLoss():
+    """
+    Implementation heavily inspired from https://github.com/JunMa11/SegWithDistMap
+    """
+    def __init__(self, **kwargs):
+        # Self.idc is used to filter out some classes of the target mask. Use fancy indexing
+        # self.idc: List[int] = kwargs["idc"]
+        print(f"Initialized {self.__class__.__name__} with {kwargs}")
+
+    def __call__(self, preds: Tensor, target: Tensor) -> Tensor:
+        probs = F.softmax(preds, dim=1)
+        # probs = F.sigmoid(preds)
+        print(f'preds shape = {preds.shape}, target shape = {target.shape}')
+        print(f'simplex axis 0: {simplex(target, axis=0)}, simplex axis 1: {simplex(target, axis=1)}, simplex axis 2: {simplex(target, axis=2)}')
+        print(f'max in target = {torch.max(target)}')
+        assert simplex(probs, axis=1)
+        assert simplex(target, axis=1)
+        assert probs.shape == target.shape
+
+        B, K, *xyz = probs.shape  # type: ignore
+
+        pc = cast(Tensor, probs[:, ...].type(torch.float32))
+        tc = cast(Tensor, target[:, ...].type(torch.float32))
+        assert pc.shape == tc.shape == (B, 1, *xyz)
+
+        target_dm_npy: np.ndarray = np.stack([one_hot2hd_dist(tc[b].cpu().detach().numpy())
+                                              for b in range(B)], axis=0)
+        assert target_dm_npy.shape == tc.shape == pc.shape
+        tdm: Tensor = torch.tensor(target_dm_npy, device=probs.device, dtype=torch.float32)
+
+        pred_segmentation: Tensor = probs2one_hot(probs).cpu().detach()
+        pred_dm_npy: np.nparray = np.stack([one_hot2hd_dist(pred_segmentation[b, ...].numpy())
+                                            for b in range(B)], axis=0)
+        assert pred_dm_npy.shape == tc.shape == pc.shape
+        pdm: Tensor = torch.tensor(pred_dm_npy, device=probs.device, dtype=torch.float32)
+
+        delta = (pc - tc)**2
+        dtm = tdm**2 + pdm**2
+
+        multipled = einsum("bkwh,bkwh->bkwh", delta, dtm)
+
+        loss = multipled.mean()
+
+        return loss
+
+
+class FocalLoss():
+    def __init__(self, **kwargs):
+        # Self.idc is used to filter out some classes of the target mask. Use fancy indexing
+        # self.idc: List[int] = kwargs["idc"]
+        self.gamma: float = kwargs["gamma"]
+        print(f"Initialized {self.__class__.__name__} with {kwargs}")
+
+    def __call__(self, probs: Tensor, target: Tensor) -> Tensor:
+        probs = F.sigmoid(probs)
+        assert simplex(probs) and simplex(target)
+
+        masked_probs: Tensor = probs[:, ...]
+        log_p: Tensor = (masked_probs + 1e-10).log()
+        mask: Tensor = cast(Tensor, target[:, ...].type(torch.float32))
+
+        w: Tensor = (1 - masked_probs)**self.gamma
+        loss = - einsum("bkwh,bkwh,bkwh->", w, mask, log_p)
+        loss /= mask.sum() + 1e-10
+
+        return loss
+
+# Ending here
+###############################################################################
 
 
 class EpicLoss(nn.Module):
     def __init__(self, weight=None, size_average=True, eps=1e-7, 
-                 ratio_weight=0.5, iou_weight=0.7, 
-                 focal_weight=0.0, cross_entropy_weight=0.3):
+                iou_weight=0.3, dice_weight=0.2, boundary_weight=0.4,
+                focal_weight=0.0, cross_entropy_weight=0.1):
         """Initialize the loss function"""
         
         super(EpicLoss, self).__init__()
         
-        self.ratio_weight = ratio_weight
         self.iou_weight = iou_weight
-        self.focal_weight = focal_weight
+        # self.focal_weight = focal_weight
         self.cross_entropy_weight = cross_entropy_weight
+        self.dice_weight = dice_weight
+        self.boundary_weight = boundary_weight
+        # self.hausdorff_weight = hausdorff_weight
+        # self.surface_weight = surface_weight
         
-        self.pixel_ratio_loss = BlackToWhiteRatioLoss()
         self.iou_loss = IoULoss()
-        self.focal_loss = FocalLoss()
+        # self.focal_loss = FocalLoss(gamma=2)
         self.cross_entropy_loss = nn.BCEWithLogitsLoss()
         self.dice_loss = BinaryDiceLoss()
+        self.boundary_loss = BoundaryDoULoss(1)
+        # self.hausdorff_loss = HausdorffLoss()
+        # self.surface_loss = SurfaceLoss()
     
     def forward(self, prediction, targets, smooth=1):
         """Forward pass of the loss function"""
         # comment out if your model contains a sigmoid or equivalent activation layer
-                
-        pixel_ratio_loss = torch.abs(prediction - targets)
-        
+
+        # hausdorff_loss = self.hausdorff_loss(prediction, targets)
+        # surface_loss = self.surface_loss(prediction, targets)
+        # focal_loss = self.focal_loss(prediction, targets)
         iou_loss = self.iou_loss(prediction, targets)
-        
-        focal_loss = self.focal_loss(prediction, targets)
-        
         cross_entropy_loss = self.cross_entropy_loss(prediction, targets)
+        dice_loss = self.dice_loss(prediction, targets)
+        boundary_loss = self.boundary_loss(prediction, targets)
         
         loss = (self.iou_weight * iou_loss) + \
-               (self.focal_weight * focal_loss) + \
-               (self.cross_entropy_weight * cross_entropy_loss)# + \
-            #    (self.ratio_weight * pixel_ratio_loss)
+                (self.cross_entropy_weight * cross_entropy_loss) + \
+                (self.dice_weight * dice_loss) + \
+                (self.boundary_weight * boundary_loss)
+                # (self.focal_weight * focal_loss) + \
+            #    (self.hausdorff_weight * hausdorff_loss) + \
+            #    (self.surface_weight * surface_loss)
         
         return loss
+class ReduceLROnThreshold(_LRScheduler):
+    """Writtern by GPT 4.
+    Reduces learning rate when a metric has passed a threshold.
+    """
+    def __init__(self, optimizer, threshold, factor=0.1, mode='above', verbose=False, **kwargs):
+        self.threshold = threshold
+        self.factor = factor
+        self.verbose = verbose
+        self.mode = mode
+        super().__init__(optimizer, **kwargs)
+        
+    def step(self, metric=None):
+        # need to do this because the scheduler is called before the metric is calculated
+        # in super().__init__(optimizer, **kwargs) in __init__
+        if metric is None:
+            # If no metric is provided, just pass as the base class does nothing in its step method.
+            return
+        
+        if self.mode == 'above':
+            condition = metric > self.threshold
+        elif self.mode == 'below':
+            condition = metric < self.threshold
+        else:
+            raise ValueError(f"mode must be 'above' or 'below', got {self.mode}")
+        
+        if condition:
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] *= self.factor
+            if self.verbose:
+                print(f"Reducing learning rate to {param_group['lr']} for metric {metric}")
+    
+    # def get_lr(self) -> float:
+    #     """This method needs to be redevined because the original method in _LRScheduler is not implemented."""
+    #     return [group['lr'] for group in self.optimizer.param_groups]
+
