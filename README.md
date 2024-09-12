@@ -22,6 +22,7 @@ Example:
 The data for this project is available on the [competition page](https://www.kaggle.com/competitions/blood-vessel-segmentation/data), it consists of 3 entire kidneys scanned in 3D using Hierarchical Phase-Contrast Tomography (HiP-CT) imaging. 
 
 Animation:
+
 ![figure 2: animation of kidney data](_readme_ims/animation.gif)
 
 ### Data pre-processing:
