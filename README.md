@@ -33,4 +33,6 @@ Images are broken into 512x512 tiles that are uniformly distributed over the ima
 Improved unet paper, attention unet paper
 
 ## References:
-1. Yashvardhan Jain, Katy Borner, Claire Walsh, Nancy Ruschman, Peter D. Lee, Griffin M. Weber, Ryan Holbrook, Addison Howard. (2023). SenNet + HOA - Hacking the Human Vasculature in 3D. Kaggle. https://kaggle.com/competitions/blood-vessel-segmentation
+1. Yashvardhan Jain, Katy Borner, Claire Walsh, Nancy Ruschman, Peter D. Lee, Griffin M. Weber, Ryan Holbrook, Addison Howard. (2023). SenNet + HOA - Hacking the Human Vasculature in 3D. Kaggle. Available at: https://kaggle.com/competitions/blood-vessel-segmentation
+2. Isensee, F. et al. (2018) Brain tumor segmentation and radiomics survival prediction: Contribution to the brats 2017 challenge, arXiv.org. Available at: https://arxiv.org/abs/1802.10508
+3. Oktay, O. et al. (2018) Attention U-net: Learning where to look for the pancreas, arXiv.org. Available at: https://arxiv.org/abs/1804.03999 (Accessed: 12 September 2024). 
