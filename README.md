@@ -21,7 +21,7 @@ Example:
 ## Data:
 The data for this project is available on the [competition page](https://www.kaggle.com/competitions/blood-vessel-segmentation/data), it consists of 3 entire kidneys scanned in 3D using Hierarchical Phase-Contrast Tomography (HiP-CT) imaging. 
 
-Animation: \\
+Animation:
 ![figure 2: animation of kidney data](_readme_ims/animation.gif)
 
 ### Data pre-processing:
@@ -30,7 +30,7 @@ Images are broken into 512x512 tiles that are uniformly distributed over the ima
 ![figure 3: example of tiling](_readme_ims/tiling_example.png)
 
 ## Model:
-Improved unet paper, attention unet paper
+The model is a 2D implementation of the Improved UNet architecture proposed in [2], that incorporates attention gates on the skip connections as in the Attention U-Net paper[3]
 
 ## References:
 1. Yashvardhan Jain, Katy Borner, Claire Walsh, Nancy Ruschman, Peter D. Lee, Griffin M. Weber, Ryan Holbrook, Addison Howard. (2023). SenNet + HOA - Hacking the Human Vasculature in 3D. Kaggle. Available at: https://kaggle.com/competitions/blood-vessel-segmentation
