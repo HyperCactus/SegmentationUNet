@@ -31,7 +31,11 @@ Images are broken into 512x512 tiles that are uniformly distributed over the ima
 ![figure 3: example of tiling](_readme_ims/tiling_example.png)
 
 ## Model:
-The model is a 2D implementation of the Improved UNet architecture proposed in [2], that incorporates attention gates on the skip connections as in the Attention U-Net paper[3]
+The model is a 2D implementation of the Improved UNet architecture proposed in [2]:
+![figure 4: Improved UNet Archetecture](_readme_ims/Improved_UNet_archetecture.PNG)
+ that incorporates attention gates on the skip connections as in the Attention U-Net paper[3]:
+ ![figure 5: Attension gated UNet Archetecture](_readme_ims/AttensionUNet_archetecture.PNG)
+ This archetecture was arrived at through experimentation with both archetectures in many configurations. Fully 3D as well as "2.5D" stacked layer versions of the model where also tried, but the 2D model scored highest in the 3D surface dice metric.
 
 ## References:
 1. Yashvardhan Jain, Katy Borner, Claire Walsh, Nancy Ruschman, Peter D. Lee, Griffin M. Weber, Ryan Holbrook, Addison Howard. (2023). SenNet + HOA - Hacking the Human Vasculature in 3D. Kaggle. Available at: https://kaggle.com/competitions/blood-vessel-segmentation
