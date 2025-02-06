@@ -1,4 +1,4 @@
-# 3DImprovedUNet
+# ImprovedUNet
 #### This is my entry to the [SenNet + HOA - Hacking the Human Vasculature in 3D](https://www.kaggle.com/competitions/blood-vessel-segmentation) Competition on Kaggle
 
 ## Files:
@@ -21,12 +21,10 @@ Example:
 ## Data:
 The data for this project is available on the [competition page](https://www.kaggle.com/competitions/blood-vessel-segmentation/data), it consists of 3 entire kidneys scanned in 3D using Hierarchical Phase-Contrast Tomography (HiP-CT) imaging. 
 
-Animation:
-
 ![figure 2: animation of kidney data](_readme_ims/animation.gif)
 
 ### Data pre-processing:
-Images are broken into 512x512 tiles that are uniformly distributed over the image with some stride. After inference, the overlapping sections of the predictions are averaged, which acts as a form of TTA (test time augmentation) to resulting in improvements in accuracy at the expense of higher inference time due to more passes through the model. Increasing the number of image tiles improves accuracy with diminishing returns. In testing, increasing the number of tiles from 3x3 to 8x6 resulted in a 3.27% increase in the 3D surface dice coefficient, while requiring 48 passes through the model per image rather then 9.
+Images are broken into 512x512 tiles that are uniformly distributed over the image with some stride. After inference, the overlapping sections of the predictions are averaged, which acts as a form of TTA (test time augmentation) resulting in improvements in accuracy at the expense of higher inference time due to more passes through the model. Increasing the number of image tiles improves accuracy with diminishing returns. In testing, increasing the number of tiles from 3x3 to 8x6 resulted in a 3.27% increase in the 3D surface dice coefficient, while requiring 48 passes through the model per image rather then 9.
 
 ![figure 3: example of tiling](_readme_ims/tiling_example.png)
 
